@@ -1,0 +1,7 @@
+python-dotenv
+aiogram
+aiohttp
+asyncpg
+sqlalchemy
+pydantic
+oauthlib
