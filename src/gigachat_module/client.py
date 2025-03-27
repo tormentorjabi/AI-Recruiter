@@ -9,8 +9,8 @@ load_dotenv()
 
 SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
 AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY")
-MODEL = os.getenv("GIGACHAT_MODEL")
-CERTIFICATE_BUNDLE_FILE = os.getenv("CA_BUNDLE_FILE")
+MODEL = os.getenv("GIGACHAT_MODEL","")
+CERTIFICATE_BUNDLE_FILE = os.getenv("CA_BUNDLE_FILE","")
 
 
 def get_gigachat_client() -> GigaChat:
