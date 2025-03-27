@@ -5,3 +5,5 @@ asyncpg
 sqlalchemy
 pydantic
 oauthlib
+langchain-gigachat
+gigachat
