@@ -14,6 +14,12 @@ CERTIFICATE_BUNDLE_FILE = os.getenv("CA_BUNDLE_FILE")
 
 
 def get_gigachat_client() -> GigaChat:
+    """
+    Инициализацировать GigaChat клиент.
+    
+    Returns:
+        GigaChat: Настроенный по параметрам из переменных окружения, GigaChat клиент.
+    """
     try:
         if not AUTH_KEY:
             raise ValueError("GigaChat credentials not found in environmental variables.")
