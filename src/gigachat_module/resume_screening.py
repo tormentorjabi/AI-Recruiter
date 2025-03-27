@@ -3,11 +3,11 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 class ResumeScreening:
     """
-    Скрининг резюме кандидата.
+    Скрининг резюме кандидата
     
     Methods:
         screen_resume(resume_info):
-            Проводит оценку резюме кандидата с помощью GigaChat.
+            Проводит оценку резюме кандидата с помощью GigaChat
     """
     def __init__(self):
         # Инициализируем GigaChat клиент
