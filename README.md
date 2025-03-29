@@ -6,7 +6,7 @@
 
 `deploy` - развертывание
 
-`src/bot` - Telegram-бот
+`src/bot` - модуль Telegram-бота
 
 `src/bot/core` - основная логика бота
 
@@ -14,9 +14,9 @@
 
 `src/bot/utils` - вспомогательные функции
 
-`src/database` - логика работы с БД
+`src/database` - модуль логики работы с БД
 
-`src/gigachat` - логика работы с моделью GigaChat
+`src/gigachat_module` - модуль логики работы с моделью GigaChat
 
 `tests` - тесты
 
