@@ -11,6 +11,20 @@ from session import Base
 
 
 class Candidate(Base):
+    """
+    Модель соискателя вакансии
+    
+    Fields:
+        full_name (str): Полное имя
+        birth_date (date): Дата рождения
+        city (str): Город проживания
+        citizenship (str): Гражданство
+        relocation_ready (bool): Готовность к переезду
+        telegram_id (str): ID Telegram
+        status (str): Статус кандидата
+        created_at (datetime): Время создания записи
+        updated_at (datetime): Время обновления записи
+    """
     __tablename__ = 'candidates'
     
     id = Column(Integer, primary_key=True)
