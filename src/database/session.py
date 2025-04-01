@@ -10,7 +10,25 @@ load_dotenv()
 
 DATABASE_URL = os.getenv('DB_URL', 'sqlite:///recruiter.db')
 
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(autoflush=False, bind=engine)
+if DATABASE_URL.startswith('sqlite'):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=True  # Only for development
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=5,
+        max_overflow=10,
+        echo=True
+    )
 
 Base = declarative_base()
+
+Session = sessionmaker(
+    autoflush=False, 
+    bind=engine
+)
+
+from .models import *
