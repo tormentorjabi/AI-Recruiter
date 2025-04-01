@@ -6,7 +6,7 @@ from sqlalchemy import (
     DateTime
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from session import Base
+from src.database.session import Base
 
 
 class AnalysisResult(Base):

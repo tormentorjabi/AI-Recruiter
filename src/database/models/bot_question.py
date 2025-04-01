@@ -4,7 +4,7 @@ from sqlalchemy import (
     Integer, 
     Text
 )
-from session import Base
+from src.database.session import Base
 
 
 class BotQuestion(Base):

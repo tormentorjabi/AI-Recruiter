@@ -5,7 +5,7 @@ from sqlalchemy import (
     String,
     DateTime
 )
-from session import Base
+from src.database.session import Base
 
 
 class BotInteraction(Base):

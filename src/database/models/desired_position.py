@@ -5,7 +5,7 @@ from sqlalchemy import (
     Numeric,
     ForeignKey
 )
-from session import Base
+from src.database.session import Base
 
 
 class DesiredPosition(Base):

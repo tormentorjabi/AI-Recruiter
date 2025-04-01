@@ -3,7 +3,7 @@ from sqlalchemy import (
     String,
     Integer
 )
-from session import Base
+from src.database.session import Base
 
 
 class EmploymentType(Base):

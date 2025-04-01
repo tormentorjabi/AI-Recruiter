@@ -6,7 +6,7 @@ from sqlalchemy import (
     Text,
     Date
 )
-from session import Base
+from src.database.session import Base
 
 
 class WorkExperience(Base):

@@ -6,8 +6,8 @@ from sqlalchemy import (
     DateTime
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from src.database.session import Base
 from datetime import datetime
-from session import Base
 
 
 class CandidateAnswer(Base):

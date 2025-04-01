@@ -3,7 +3,7 @@ from sqlalchemy import (
     Integer, 
     String
 )
-from session import Base
+from src.database.session import Base
 
 
 class Skill(Base):

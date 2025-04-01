@@ -3,7 +3,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer
 )
-from session import Base
+from src.database.session import Base
 
 
 class DesiredPositionEmployment(Base):
