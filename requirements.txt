@@ -7,4 +7,3 @@ pydantic
 oauthlib
 langchain-gigachat
 gigachat
-alembic
