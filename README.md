@@ -16,8 +16,14 @@
 
 `src/database` - модуль логики работы с БД
 
+`src/database/models` - модели сущностей БД
+
+`src/database/migrations` - миграции БД
+
 `src/gigachat_module` - модуль логики работы с моделью GigaChat
 
 `tests` - тесты
 
 `requirements.txt` - зависимости Python
+
+`alembic.ini` - конфигурация Alembic
