@@ -4,9 +4,13 @@
 
 ## Структура
 
+### Развертывание
+
 `deploy` - развертывание
 
-`src/bot` - модуль Telegram-бота
+### Telegram бот
+
+`src/bot` - модуль Telegram бота
 
 `src/bot/core` - основная логика бота
 
@@ -14,10 +18,24 @@
 
 `src/bot/utils` - вспомогательные функции
 
+### База данных
+
 `src/database` - модуль логики работы с БД
+
+`src/database/models` - модели сущностей БД
+
+`src/database/migrations` - миграции БД
+
+### GigaChat
 
 `src/gigachat_module` - модуль логики работы с моделью GigaChat
 
+### Тестирование
+
 `tests` - тесты
 
+### Общее
+
 `requirements.txt` - зависимости Python
+
+`alembic.ini` - конфигурация Alembic
