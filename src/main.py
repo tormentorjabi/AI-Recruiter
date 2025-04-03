@@ -2,8 +2,8 @@ import os
 import asyncio
 
 from dotenv import load_dotenv
-from bot.core.bot import bot, dp
-from gigachat_module.client import get_gigachat_client
+from src.bot.core.bot import bot, dp
+from src.gigachat_module.client import get_gigachat_client
 from langchain_core.messages import HumanMessage, SystemMessage
 
 
