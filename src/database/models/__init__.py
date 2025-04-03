@@ -15,6 +15,8 @@ from .bot_question import BotQuestion
 from .desired_position_employment import DesiredPositionEmployment
 from .desired_position_schedule import DesiredPositionSchedule
 from .candidate_skill import CandidateSkill
+from .hr_specialist import HrSpecialist
+from .registration_token import RegistrationToken
 
 
 __all__ = [
@@ -35,4 +37,6 @@ __all__ = [
     "DesiredPositionEmployment",
     "DesiredPositionSchedule",
     "CandidateSkill",
+    "HrSpecialist",
+    "RegistrationToken",
 ]
