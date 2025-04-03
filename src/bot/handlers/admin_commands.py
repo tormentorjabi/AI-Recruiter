@@ -21,7 +21,6 @@ async def generate_token(message: types.Message):
         parse_mode="Markdown"
     )
     
-    generated_token = None
     
     with Session() as db:
         admin = db.query(HrSpecialist).filter_by(
