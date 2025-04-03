@@ -17,6 +17,7 @@ class HrNotification(Base):
     
     Fields:
         candidate_id (int): FK на соискателя по вакансии
+        hr_specialist_id (int): FK на HR-специалиста
         channel (str): Канал связи с HR-специалистом
         sent_data (JSONB): Данные для передачи
         sent_at (datetime): Время отправления сообщения
@@ -26,11 +27,14 @@ class HrNotification(Base):
     
     id = Column(Integer, primary_key=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
+    hr_specialist_id = Column(Integer, ForeignKey('hr_specialists.id'))
     channel = Column(String(20), server_default='telegram')
     sent_data = Column(JSONB)
     sent_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String(20), server_default='sent')
     
     candidate = relationship("Candidate", back_populates="notifications")
-    hr_specialist = relationship("HrSpecialist", back_populates="notifications")
+    hr_specialist = relationship("HrSpecialist",
+                                 foreign_keys=[hr_specialist_id], 
+                                 back_populates="notifications")
     

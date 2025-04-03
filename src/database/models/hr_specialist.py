@@ -38,5 +38,7 @@ class HrSpecialist(Base):
         foreign_keys="RegistrationToken.used_by",
         back_populates="used_by_hr"
     )
-    notifications = relationship("HrNotification", back_populates="hr_specialist")
+    notifications = relationship("HrNotification",
+                                 foreign_keys="[HrNotification.hr_specialist_id]", 
+                                 back_populates="hr_specialist")
     
