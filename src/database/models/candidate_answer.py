@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 from datetime import datetime
 
@@ -35,4 +36,7 @@ class CandidateAnswer(Base):
     gigachat_response = Column(JSONB)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime)
+    
+    candidate = relationship("Candidate", back_populates="answers")
+    question = relationship("BotQuestion", back_populates="answers")
     

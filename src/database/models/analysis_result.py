@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -28,4 +29,6 @@ class AnalysisResult(Base):
     source = Column(String(20))
     final_decision = Column(String(20))
     processed_at = Column(DateTime)
+    
+    candidate = relationship("Candidate", back_populates="analysis_results")
     

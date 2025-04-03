@@ -4,6 +4,7 @@ from sqlalchemy import (
     Integer, 
     Text
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -22,4 +23,7 @@ class BotQuestion(Base):
     question_text = Column(Text)
     order = Column(Integer)
     expected_format = Column(String(20))
+    
+    interactions = relationship("BotInteraction", back_populates="question")
+    answers = relationship("CandidateAnswer", back_populates="question")
     

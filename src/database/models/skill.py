@@ -3,6 +3,7 @@ from sqlalchemy import (
     Integer, 
     String
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -17,4 +18,6 @@ class Skill(Base):
     
     id = Column(Integer, primary_key=True)
     skill_name = Column(String(100))
+    
+    candidate_skills = relationship("CandidateSkill", back_populates="skill")
     

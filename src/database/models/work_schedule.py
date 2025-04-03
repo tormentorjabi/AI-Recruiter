@@ -3,6 +3,7 @@ from sqlalchemy import (
     Integer, 
     String
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -23,4 +24,6 @@ class WorkSchedule(Base):
     
     id = Column(Integer, primary_key=True)
     schedule = Column(String(50))
+    
+    desired_positions = relationship("DesiredPositionSchedule", back_populates="schedule")
     

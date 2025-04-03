@@ -3,6 +3,7 @@ from sqlalchemy import (
     String,
     Integer
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -23,4 +24,6 @@ class EmploymentType(Base):
     
     id = Column(Integer, primary_key=True)
     type = Column(String(50))
+    
+    desired_positions = relationship("DesiredPositionEmployment", back_populates="employment_type")
     

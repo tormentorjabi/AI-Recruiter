@@ -4,6 +4,7 @@ from sqlalchemy import (
     Integer, 
     String
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -26,4 +27,6 @@ class Education(Base):
     degree = Column(String(100))
     field = Column(String(255))
     graduation_year = Column(Integer)
+    
+    resume = relationship("Resume", back_populates="educations")
     
