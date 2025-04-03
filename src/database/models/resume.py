@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 from datetime import datetime
 
@@ -37,4 +38,10 @@ class Resume(Base):
     analysis_status = Column(String(20), server_default='pending')
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime)
+    
+    candidate = relationship("Candidate", back_populates="resumes")
+    desired_position = relationship("DesiredPosition", back_populates="resume")
+    work_experiences = relationship("WorkExperience", back_populates="resume")
+    educations = relationship("Education", back_populates="resume")
+    skills = relationship("CandidateSkill", back_populates="resume")
     
