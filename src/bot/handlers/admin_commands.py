@@ -1,16 +1,22 @@
-from aiogram import types
+from aiogram import types, Router
+from aiogram.filters import Command
 from src.database.session import Session
 from src.database.models import RegistrationToken, HrSpecialist
-from src.bot.core.bot import dp
 from src.bot.config import ADMIN_CHANNEL_ID, ADMIN_USER_ID
 
 
-@dp.message_handler(
-    chat_id=ADMIN_CHANNEL_ID,
-    user_id=ADMIN_USER_ID,
-    commands=["generate_token"]
-)
+admin_router = Router()
+
+
+@admin_router.message(Command('generate_token'))
 async def generate_token(message: types.Message):
+    await message.answer(
+        f"Запрос получен, ожидайте\n",
+        parse_mode="Markdown"
+    )
+    
+    generated_token = None
+    
     with Session() as db:
         admin = db.query(HrSpecialist).filter_by(
             telegram_id=str(ADMIN_USER_ID)
@@ -25,14 +31,14 @@ async def generate_token(message: types.Message):
             db.add(admin)
             db.commit()
     
-    token = RegistrationToken.generate_token(admin.id)
-    
-    with Session() as db:
+        token = RegistrationToken.generate_token(admin.id)
+        generate_token = token.token
+        
         db.add(token)
         db.commit()
     
     await message.answer(
         f"Токен для регистрации HR-специалиста (активен 24ч):\n"
-        f"`{token.token}`",
+        f"`{generate_token}`",
         parse_mode="Markdown"
     )
