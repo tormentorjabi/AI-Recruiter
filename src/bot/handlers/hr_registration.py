@@ -92,9 +92,10 @@ async def process_full_name(message: Message, state: FSMContext):
         
         await message.bot.send_message(
             ADMIN_CHANNEL_ID,
-            f"🆕 Новый HR зарегистрирован: {new_hr.full_name} "
-            f"(ID: {new_hr.telegram_id})\n"
-            f"tg://user?id={new_hr.telegram_id}"
+            f"🆕 Новый HR зарегистрирован: "
+            f"[{new_hr.full_name}](tg://user?id={new_hr.telegram_id})\n"
+            f"ID: `{new_hr.telegram_id}`",
+            parse_mode="MarkdownV2"
         )
         
     await state.clear()
