@@ -6,6 +6,9 @@ from datetime import datetime
 scheduler = AsyncIOScheduler()
 
 def cleanup_expired_tokens():
+    """
+    AsyncIOScheduler задача, на удаление из базы данных истекших токенов регистрации для HR-специалистов
+    """
     with Session() as db:
         db.query(RegistrationToken).filter(
             RegistrationToken.expires_at < datetime.utcnow()
