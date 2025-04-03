@@ -10,6 +10,12 @@ admin_router = Router()
 
 @admin_router.message(Command('generate_token'))
 async def generate_token(message: types.Message):
+    if message.chat.id != ADMIN_CHANNEL_ID:
+        await message.answer(
+            f"Вызов команды из этого чата недоступен",
+        )
+        return
+    
     await message.answer(
         f"Запрос получен, ожидайте\n",
         parse_mode="Markdown"
