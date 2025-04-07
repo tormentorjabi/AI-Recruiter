@@ -17,7 +17,7 @@ class HrRegistrationStates(StatesGroup):
     waiting_for_full_name = State()
     
     
-@registration_router.message(Command('registerHR'))
+@registration_router.message(Command('register_hr'))
 async def start_hr_registration(message: Message, state: FSMContext):
     await message.answer(
         'Введите регистрационный токен, выданный администратором:',

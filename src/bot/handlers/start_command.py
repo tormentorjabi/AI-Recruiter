@@ -8,7 +8,7 @@ start_router = Router()
 @start_router.message(CommandStart)
 async def welcome_command(message: Message):
     user_commands = (
-        "• /registerHR — Зарегистрироваться как HR-специалист\n"
+        "• /register_hr — Зарегистрироваться как HR-специалист\n"
     )
     admin_commands = (
         "Команды администратора:\n"
