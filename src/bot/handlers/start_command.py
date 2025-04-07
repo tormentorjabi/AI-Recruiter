@@ -13,13 +13,13 @@ async def welcome_command(message: Message):
     admin_commands = (
         "Команды администратора:\n"
         "• /generate_token — Сгенерировать токен для регистрации HR\n"
-        "• /list_HR — Список зарегистрированных HR-специалистов"
+        "• /list_hr — Список зарегистрированных HR-специалистов\n"
+        "• /delete_hr <Telegram ID HR-специалиста> — Удалить HR-специалиста\n"
     )
     
     await message.answer(
         "Доступные команды:\n"
         f"{user_commands}\n"
-        f"{admin_commands}",
-        parse_mode="HTML"
+        f"{admin_commands}"
     )
     
