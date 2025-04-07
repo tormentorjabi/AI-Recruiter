@@ -1,7 +1,7 @@
 from aiogram import F
 from aiogram import Router
 from aiogram.types import Message
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -157,7 +157,7 @@ async def delete_hr(
 
 
 @admin_router.message(
-    DeleteHRStates.waiting_for_confirmation,
+    StateFilter(DeleteHRStates.waiting_for_confirmation),
     F.text.casefold().in_({"да", "yes", "д", "y"})
 )
 async def confirm_delete(message: Message, state: FSMContext):
@@ -184,7 +184,7 @@ async def confirm_delete(message: Message, state: FSMContext):
 
 
 @admin_router.message(
-    DeleteHRStates.waiting_for_confirmation
+    StateFilter(DeleteHRStates.waiting_for_confirmation)
 )
 async def cancel_delete(message: Message, state: FSMContext):
     await message.answer("❌ Удаление отменено пользователем")
