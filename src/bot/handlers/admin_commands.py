@@ -2,12 +2,19 @@ from aiogram import F
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+
 from src.database.session import Session
 from src.database.models import RegistrationToken, HrSpecialist
 from src.bot.config import ADMIN_CHANNEL_ID, ADMIN_USER_ID
 
 
 admin_router = Router()
+
+
+class DeleteHRStates(StatesGroup):
+    waiting_for_confirmation = State()
 
 
 @admin_router.message(
@@ -95,14 +102,17 @@ async def get_hr_list(message: Message):
     Command('delete_hr'),
     F.chat.id == ADMIN_CHANNEL_ID
 )
-async def delete_hr(message: Message):
+async def delete_hr(
+    message: Message,
+    state: FSMContext
+):
     if message.chat.id != ADMIN_CHANNEL_ID:
         await message.answer(
             f"Вызов команды из этого чата недоступен",
         )
         return
     
-    args = message.text.split(maxsplit=1)[1:]
+    args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
     
     if not args:
         await message.answer(
@@ -135,14 +145,47 @@ async def delete_hr(message: Message):
                 f"/list_hr"
             )
             return
-            
-        db.query(RegistrationToken).filter_by(
-            used_by = hr.id
-        ).delete()
+        
+        await state.update_data(hr_id=hr.id, telegram_id=telegram_id)
+        await message.answer(
+            f"⚠️ Вы уверены, что хотите удалить HR-специалиста:\n"
+            f"Имя: {hr.full_name}\n"
+            f"ID: {telegram_id}\n\n"
+            "Введите [Да/Нет] для подтверждения:"
+        )
+        await state.set_state(DeleteHRStates.waiting_for_confirmation)
+
+
+@admin_router.message(
+    DeleteHRStates.waiting_for_confirmation,
+    F.text.casefold().in_({"да", "yes", "д", "y"})
+)
+async def confirm_delete(message: Message, state: FSMContext):
+    data = await state.get_data()
+
+    with Session() as db:
+        hr = db.query(HrSpecialist).get(data['hr_id'])
+
+        if not hr:
+            await message.answer("❌ HR-специалист не найден в базе данных")
+            await state.clear()
+            return
+
+        db.query(RegistrationToken).filter_by(used_by=hr.id).delete()
         db.delete(hr)
         db.commit()
-        
+
         await message.answer(
-            f"✅ HR-специалист {hr.full_name} (ID: `{telegram_id}`) удален",
+            f"✅ HR-специалист {hr.full_name} (ID: {data['telegram_id']}) удален",
             parse_mode="Markdown"
         )
+
+    await state.clear()
+
+
+@admin_router.message(
+    DeleteHRStates.waiting_for_confirmation
+)
+async def cancel_delete(message: Message, state: FSMContext):
+    await message.answer("❌ Удаление отменено пользователем")
+    await state.clear()
