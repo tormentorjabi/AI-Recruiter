@@ -92,7 +92,8 @@ async def get_hr_list(message: Message):
             response += (
                 f"• {hr.full_name}\n"
                 f"  ID: `{hr.telegram_id}`\n"
-                f"  Дата регистрации: {hr.created_at.strftime('%d.%m.%Y %H:%M')}\n\n"    
+                f"  Дата регистрации: {hr.created_at.strftime('%d.%m.%Y %H:%M')}\n"
+                f"  Текущий режим работы: `{"Активен" if hr.work_mode else "Не активен"}`\n\n"    
             )
         
         await message.answer(response, parse_mode="Markdown")
@@ -141,7 +142,7 @@ async def delete_hr(
                 parse_mode="Markdown"
             )
             await message.answer(
-                f"Найти ID необходимого сотрудника можно с помощью комманды: "
+                f"Найти ID необходимого сотрудника можно с помощью команды: "
                 f"/list_hr"
             )
             return

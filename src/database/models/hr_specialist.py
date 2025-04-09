@@ -17,7 +17,8 @@ class HrSpecialist(Base):
     Fields:
         telegram_id (str): ID HR-специалиста в Telegram
         full_name (sdr): ФИО HR-специалиста
-        is_approved (boolean): Статус подтверждения профиля в Telegram
+        is_approved (boolean): Статус подтверждения регистрации профиля Telegram в нашей системе
+        work_mode (boolean): Готовность получения уведомлений о кандидатах (Готов/Не готов)
         created_at (datetime): Время создания записи
     """
     __tablename__ = 'hr_specialists'
@@ -26,6 +27,7 @@ class HrSpecialist(Base):
     telegram_id = Column(String(50), unique=True, nullable=False)
     full_name = Column(String(255))
     is_approved = Column(Boolean, default=False)
+    work_mode = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     created_tokens = relationship(
