@@ -9,6 +9,7 @@ start_router = Router()
 
 USER_COMMANDS = (
         "• /register_hr — Зарегистрироваться как HR-специалист\n"
+        "• /change_work_mode — Сменить режим работы\n"
     )
 ADMIN_COMMANDS = (
         "• /generate_token — Сгенерировать токен для регистрации HR\n"

@@ -141,7 +141,7 @@ async def delete_hr(
                 parse_mode="Markdown"
             )
             await message.answer(
-                f"Найти ID необходимого сотрудника можно с помощью комманды: "
+                f"Найти ID необходимого сотрудника можно с помощью команды: "
                 f"/list_hr"
             )
             return

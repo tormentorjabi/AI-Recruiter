@@ -135,7 +135,8 @@ async def process_full_name(message: Message, state: FSMContext):
     await message.answer(
         "✅ Регистрация успешно завершена!\n"
         f"Добро пожаловать, {hr_full_name}!\n"
-        "Теперь вы будете получать уведомления о кандидатах."
+        "Чтобы начать получать уведомления о новых кандидатах "
+        "воспользуйтесь командой /change_work_mode"
     )
             
     await message.bot.send_message(
