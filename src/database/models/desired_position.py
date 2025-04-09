@@ -5,6 +5,7 @@ from sqlalchemy import (
     Numeric,
     ForeignKey
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -23,4 +24,8 @@ class DesiredPosition(Base):
     resume_id = Column(Integer, ForeignKey('resumes.id'))
     position = Column(String(255))
     salary = Column(Numeric)
+    
+    resume = relationship("Resume", back_populates="desired_position")
+    schedules = relationship("DesiredPositionSchedule", back_populates="desired_position")
+    employment_types = relationship("DesiredPositionEmployment", back_populates="desired_position")
     

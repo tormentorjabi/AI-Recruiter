@@ -6,6 +6,7 @@ from sqlalchemy import (
     Date, 
     DateTime
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 from datetime import datetime
 
@@ -37,4 +38,11 @@ class Candidate(Base):
     status = Column(String(50), server_default='pending')
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime)
+    
+    resumes = relationship("Resume", back_populates="candidate", cascade="all, delete")
+    notifications = relationship("HrNotification", back_populates="candidate")
+    bot_interactions = relationship("BotInteraction", back_populates="candidate")
+    answers = relationship("CandidateAnswer", back_populates="candidate")
+    analysis_results = relationship("AnalysisResult", back_populates="candidate")
+    applications = relationship("Application", back_populates="candidate")
     

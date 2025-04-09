@@ -9,3 +9,4 @@ langchain-gigachat
 gigachat
 alembic
 psycopg2
+APScheduler

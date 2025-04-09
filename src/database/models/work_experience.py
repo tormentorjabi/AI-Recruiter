@@ -6,6 +6,7 @@ from sqlalchemy import (
     Text,
     Date
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -30,4 +31,6 @@ class WorkExperience(Base):
     description = Column(Text)
     start_date = Column(Date)
     end_date = Column(Date)
+    
+    resume = relationship("Resume", back_populates="work_experiences")
     

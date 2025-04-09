@@ -5,6 +5,7 @@ from sqlalchemy import (
     String,
     DateTime
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -31,4 +32,7 @@ class BotInteraction(Base):
     current_state = Column(String(50))
     last_active = Column(DateTime)
     updated_at = Column(DateTime)
+    
+    candidate = relationship("Candidate", back_populates="bot_interactions")
+    question = relationship("BotQuestion", back_populates="interactions")
     
