@@ -18,6 +18,7 @@ class CandidateAnswer(Base):
     Fields:
         candidate_id (int): FK на соискателя по вакансии
         question_id (int): FK на текущий вопрос из банка вопросов
+        application_id (int): FK на отклик
         answer_text (text): Подготовленные и обобщенные ответы кандидата, для их отправки в GigaChat
         gigachat_response (JSONB): Последний результат GigaChat по ответам из Telegram бота
         created_at (datetime): Дата создания записи
@@ -28,6 +29,7 @@ class CandidateAnswer(Base):
     id = Column(Integer, primary_key=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
     question_id = Column(Integer, ForeignKey('bot_questions.id'))
+    application_id = Column(Integer, ForeignKey('applications.id'))
     # Аналогично с resumes.parsed_text предлагаю сохранять здесь итоговую строку,
     # сконструированную из ответов кандидата, которую будем отправлять на обработку
     # в GigaChat
@@ -39,4 +41,5 @@ class CandidateAnswer(Base):
     
     candidate = relationship("Candidate", back_populates="answers")
     question = relationship("BotQuestion", back_populates="answers")
+    application = relationship("Application", back_populates="answers")
     
