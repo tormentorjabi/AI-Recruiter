@@ -13,6 +13,7 @@ from src.database.session import Base
 
 class ApplicationStatus(PyEnum):
     ACTIVE = "active"
+    UNDER_REVIEW = "under_review"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
 
@@ -23,7 +24,7 @@ class Application(Base):
     Fields:
         candidate_id (int): FK на соискателя по вакансии
         vacancy_id (id): FK на вакансию
-        status (enum): Статус заявки ('active', 'completed', 'rejected')
+        status (enum): Статус заявки ('active', 'accepted', 'rejected')
         application_date (datetime): Дата получения отклика
     """
     __tablename__ = 'applications'
