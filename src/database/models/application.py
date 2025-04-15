@@ -13,7 +13,7 @@ from src.database.session import Base
 
 class ApplicationStatus(PyEnum):
     ACTIVE = "active"
-    UNDER_REVIEW = "under_review"
+    REVIEW = "review"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
 
