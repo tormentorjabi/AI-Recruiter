@@ -41,7 +41,7 @@ class Candidate(Base):
     
     resumes = relationship("Resume", back_populates="candidate", cascade="all, delete")
     notifications = relationship("HrNotification", back_populates="candidate")
-    bot_interactions = relationship("BotInteraction", back_populates="candidate")
+    interactions = relationship("BotInteraction", back_populates="candidate")
     answers = relationship("CandidateAnswer", back_populates="candidate")
     analysis_results = relationship("AnalysisResult", back_populates="candidate")
     applications = relationship("Application", back_populates="candidate")

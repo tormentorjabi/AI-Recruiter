@@ -32,16 +32,33 @@ class CandidateStates(StatesGroup):
     editing = State()
 
 
-@candidate_router.message(Command("cancel"), StateFilter("*"))
-async def cancel_interaction(message: Message, state: FSMContext):
-    current_state = await state.get_state()
-    if current_state is None:
-        return
+@candidate_router.message(Command('cancel'))
+@candidate_router.callback_query(F.data == 'cancel_process')
+async def cancel_interaction(
+    query_or_msg: Message | CallbackQuery, 
+    state: FSMContext
+):
+    if isinstance(query_or_msg, CallbackQuery):
+        await query_or_msg.message.delete()
+        message = query_or_msg.message
+    else:
+        message = query_or_msg
+
+    data = await state.get_data()
+    if data.get('current_question', 0) > 0:
+        with Session() as db:
+            interaction = db.query(BotInteraction).filter_by(
+                candidate_id=data['candidate_id'],
+                application_id=data['application_id']
+            ).first()
+            if interaction:
+                interaction.current_state = 'paused'
+                interaction.current_question = data['current_question']
+                interaction.answers = data['answers']
+                db.commit()
 
     await state.clear()
-    await message.answer(
-        "❌ Процесс отменен. Для начала нового сеанса используйте /start"
-    )
+    await message.answer("❌ Процесс отменен. Для возобновления используйте /start")
     
 
 @candidate_router.message(Command("start"))
@@ -62,11 +79,16 @@ async def candidate_start(message: Message, state: FSMContext):
         application = db.query(Application).filter_by(
             candidate_id=candidate.id,
             status="active"
-        ).order_by(Application.application_date.desc()).first()
+        ).join(Vacancy).first()
         
         if not application:
             await message.answer("❌ У вас нет активных откликов на вакансии")
             return
+        
+        interaction = db.query(BotInteraction).filter_by(
+            candidate_id=candidate.id,
+            application_id=application.id
+        ).first()
         
         questions = db.query(BotQuestion).filter_by(
             vacancy_id=application.vacancy_id
@@ -77,7 +99,7 @@ async def candidate_start(message: Message, state: FSMContext):
             return
         
         vacancy = db.query(Vacancy).filter_by(
-            vacancy_id=application.vacancy_id
+            id=application.vacancy_id
         ).first()
         
         await state.update_data(
@@ -92,17 +114,20 @@ async def candidate_start(message: Message, state: FSMContext):
         questions_count = len(questions)
         first_question = questions[0]
         await message.answer(
-                f"Приветствуем вас, {candidate.full_name}!"
+                f"Приветствуем вас, {candidate.full_name}!\n\n"
                 f"Для того, чтобы мы могли принять решение по вашей кандидатуре, "
-                f"в рамках отклика на вакансию: '{vacancy.title}' вам необходимо пройти опрос, "
-                f"состоящий из {questions_count}\n\n"
+                f"в рамках отклика на вакансию: `{vacancy.title}`, вам необходимо пройти опрос, "
+                f"состоящий из {questions_count} вопросов.\n\n"
+                "Вы можете отказаться от прохождения опроса в любой момент и вернуться к нему позже.",
+                parse_mode="Markdown"
             )
         await message.answer(
-            f"Вакансия: {vacancy.title}\n"
-            f"Вопрос 1 из {questions_count}:\n"
+            f"Вакансия: `{vacancy.title}`\n"
+            f"Вопрос № 1 из {questions_count}:\n\n"
             f"{first_question.question_text}",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="Отменить прохождение ❌", callback_data="cancel")]
-            ])
+            ]),
+            parse_mode="Markdown"
         )
         await state.set_state(CandidateStates.answering)
