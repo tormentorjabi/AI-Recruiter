@@ -11,13 +11,8 @@ from datetime import datetime, timedelta
 
 from src.database.session import Session
 from src.database.models import (
-    Candidate,
-    Application,
-    BotQuestion,
-    HrNotification,
-    Vacancy,
-    BotInteraction,
-    HrSpecialist
+    Candidate, Application, BotQuestion, HrNotification,
+    Vacancy, BotInteraction, HrSpecialist
 )
 
 from src.database.models.application import ApplicationStatus
@@ -37,8 +32,57 @@ class CandidateStates(StatesGroup):
 
 
 # --------------------------
-#  Utils
+#  Core Utilities
 # --------------------------
+async def _handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
+    await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
+    logger.error(error_msg)
+
+
+async def _get_current_interaction_data(state: FSMContext):
+    data = await state.get_data()
+    return {
+        'candidate_id': data.get('candidate_id'),
+        'application_id': data.get('application_id'),
+        'current_question': data.get('current_question', 0),
+        'questions': data.get('questions', []),
+        'answers': data.get('answers', {})
+    }
+
+
+async def _update_interaction_state(application_id: int, state_data: dict):
+    with Session() as db:
+        interaction = db.query(BotInteraction).filter_by(
+            application_id=application_id
+        ).first()
+        if interaction:
+            interaction.answers = state_data['answers']
+            interaction.current_question_id = state_data['questions'][state_data['current_question']]
+            interaction.last_active = datetime.utcnow()
+            db.commit()
+
+
+# --------------------------
+#  Question Display Utilities
+# --------------------------
+def _build_choice_keyboard(choices, callback_prefix, cancel_text="❌ Отменить", is_editing=False):
+    if len(choices) > 4:
+        keyboard = [
+            [InlineKeyboardButton(text=choice, callback_data=f"{callback_prefix}_{i}") 
+             for choice in choices[i:i+2]]
+            for i in range(0, len(choices), 2)
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton(text=choice, callback_data=f"{callback_prefix}_{i}")]
+            for i, choice in enumerate(choices)
+        ]
+    
+    cancel_callback = "cancel_edit" if is_editing else "cancel_process"
+    keyboard.append([InlineKeyboardButton(text=cancel_text, callback_data=cancel_callback)])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 async def _show_question(question: BotQuestion, message: Message, state: FSMContext):
     try:
         data = await state.get_data()
@@ -46,27 +90,9 @@ async def _show_question(question: BotQuestion, message: Message, state: FSMCont
         total = len(data['questions'])
         
         if question.expected_format == AnswerFormat.CHOICE and question.choices:
-            if len(question.choices) > 4:
-                # Варианты ответов в две колонки, если их больше 4 штук
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=choice, callback_data=f"choice_{i}") 
-                     for choice in question.choices[i:i+2]]
-                    for i in range(0, len(question.choices), 2)
-                ] + [
-                    [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
-                ])
-            else:
-                # Варианты ответов в одну колонку иначе
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=choice, callback_data=f"choice_{i}")]
-                    for i, choice in enumerate(question.choices)
-                ] + [
-                    [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
-                ])
-
             await message.answer(
                 f"Вопрос {current_num}/{total} (выберите вариант):\n\n{question.question_text}",
-                reply_markup=keyboard
+                reply_markup=_build_choice_keyboard(question.choices, "choice")
             )
         else:
             format_hint = {
@@ -83,73 +109,85 @@ async def _show_question(question: BotQuestion, message: Message, state: FSMCont
                 f"Вопрос {current_num}/{total}:\n\n{question.question_text}\n\n{format_hint}",
                 reply_markup=keyboard
             )
-        
     except Exception as e:
         logger.error(f"Error showing question: {str(e)}")
         raise
 
 
-async def _handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
-    '''Обработка ошибок БД'''
-    await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
-    logger.error(error_msg)
+# --------------------------
+#  Review Utilities
+# --------------------------
+async def _build_review_content(questions, answers):
+    review_content = []
+    for idx, q in enumerate(questions):
+        answer = answers.get(str(q.id), '❌ Нет ответа')
+        if q.expected_format == AnswerFormat.FILE and answer.startswith("FILE:"):
+            answer = "📎 Прикрепленный файл"
+        review_content.append(f"{idx+1}. {q.question_text}\nОтвет: {answer}")
+    return "\n\n".join(review_content)
 
 
-async def handle_review(message: Message, state: FSMContext):
-    '''Финальная сводка по ответам кандидата'''
+async def handle_review(message: Message, state: FSMContext, page: int = 0):
     try:
         data = await state.get_data()
+        QUESTIONS_PER_PAGE = 5
         
         with Session() as db:
             questions = db.query(BotQuestion).filter(
                 BotQuestion.id.in_(data['questions'])
             ).order_by(BotQuestion.order).all()
             
-            answers = []
-            for idx, q in enumerate(questions):
-                answer = data['answers'].get(str(q.id), '❌ Нет ответа')
-                if q.expected_format == AnswerFormat.FILE and answer.startswith("FILE:"):
-                    answer = "📎 Прикрепленный файл"
-                answers.append(f"{idx+1}. {q.question_text}\nОтвет: {answer}")
+            content = await _build_review_content(questions, data['answers'])
+            page_questions = questions[page*QUESTIONS_PER_PAGE:(page+1)*QUESTIONS_PER_PAGE]
+            total_pages = (len(questions) + QUESTIONS_PER_PAGE - 1) // QUESTIONS_PER_PAGE
             
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=f"✏️ Вопрос {idx+1}", callback_data=f"edit_{q.id}")]
-                for idx, q in enumerate(questions)
-            ] + [
-                [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data="submit_answers")],
-                [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
-            ])
+            keyboard = await _build_review_keyboard(page_questions, page, total_pages)
             
-            await message.answer(
-                "📝 Ваши ответы:\n\n" + "\n\n".join(answers),
-                reply_markup=keyboard
-            )
+            if hasattr(message, 'message_id'):
+                await message.edit_text(f"📝 Ваши ответы:\n\n{content}", reply_markup=keyboard)
+            else:
+                await message.answer(f"📝 Ваши ответы:\n\n{content}", reply_markup=keyboard)
+            
             await state.set_state(CandidateStates.review)
+            await state.update_data(review_page=page)
             
     except Exception as e:
-        logger.error(f"Error generating review: {str(e)}")
-        await _handle_db_error(message)
-
-
-async def handle_next_question_auto(message: Message, state: FSMContext):
-    try:
-        data = await state.get_data()
-        current_idx = data['current_question']
-        
         with Session() as db:
-            next_question_id = data['questions'][current_idx + 1]
-            next_question = db.query(BotQuestion).get(next_question_id)
-            
-            await state.update_data(current_question=current_idx + 1)
-            await _show_question(next_question, message, state)
-            
-    except Exception as e:
-        logger.error(f"Auto next question error: {str(e)}")
+            interaction = db.query(BotInteraction).filter_by(
+                application_id=data['application_id']
+            ).first()
+            interaction.state=InteractionState.PAUSED
+            db.commit()
+        
+        logger.error(f"Review error: {str(e)}")
         await _handle_db_error(message)
+
+
+async def _build_review_keyboard(questions, current_page, total_pages):
+    keyboard = [
+        [InlineKeyboardButton(text=f"✏️ Вопрос {i+1 + current_page*5}", callback_data=f"edit_{q.id}")]
+        for i, q in enumerate(questions)
+    ]
+    
+    if total_pages > 1:
+        pagination = []
+        if current_page > 0:
+            pagination.append(InlineKeyboardButton(text="◀️", callback_data=f"review_page_{current_page-1}"))
+        pagination.append(InlineKeyboardButton(text=f"{current_page+1}/{total_pages}", callback_data="noop"))
+        if current_page < total_pages - 1:
+            pagination.append(InlineKeyboardButton(text="▶️", callback_data=f"review_page_{current_page+1}"))
+        keyboard.append(pagination)
+    
+    keyboard.extend([
+        [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data="submit_answers")],
+        [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 # --------------------------
-#  Initialize dialog and cancel dialog commands
+#  Common Handlers
 # --------------------------
 @candidate_router.message(Command('cancel'))
 @candidate_router.callback_query(F.data == 'cancel_process')
@@ -247,11 +285,14 @@ async def candidate_start(message: Message, state: FSMContext):
                     'questions': [q.id for q in questions],
                     'answers': interaction.answers or {},
                     'current_question': next(
-                        (i for i, qid in enumerate([q.id for q in questions]) 
-                        if qid == interaction.current_question_id), 0
-                    )
+                    (i for i, q in enumerate(questions) 
+                     if q.id == interaction.current_question_id), 0
+                    ),
+                    'resumed': True
                 }
+                interaction.state = InteractionState.STARTED
                 resume_question = questions[state_data['current_question']]
+                await message.answer("🔄 Возобновляем ваше предыдущее заполнение формы")
             else:
                 interaction = BotInteraction(
                     candidate_id=candidate.id,
@@ -269,7 +310,8 @@ async def candidate_start(message: Message, state: FSMContext):
                     'vacancy_title': application.vacancy.title,
                     'questions': [q.id for q in questions],
                     'answers': {},
-                    'current_question': 0
+                    'current_question': 0,
+                    'resumed': False
                 }
                 resume_question = questions[0]
             
@@ -292,34 +334,23 @@ async def candidate_start(message: Message, state: FSMContext):
 
 
 # --------------------------
-#  Candidate answers handlers
+#  Question Navigation
 # --------------------------
 @candidate_router.callback_query(F.data == "next_question", CandidateStates.answering)
 async def handle_next_question(callback: CallbackQuery, state: FSMContext):
-    '''Переход к следующему вопросу'''
     try:
-        data = await state.get_data()
-        current_idx = data['current_question']
-        questions = data['questions']
-
-        if current_idx >= len(questions) - 1:
-            # Вопросы закончились, идём к сводке
+        data = await _get_current_interaction_data(state)
+        
+        if data['current_question'] >= len(data['questions']) - 1:
             return await handle_review(callback.message, state)
 
         with Session() as db:
-            next_question_id = questions[current_idx + 1]
+            next_question_id = data['questions'][data['current_question'] + 1]
             next_question = db.query(BotQuestion).get(next_question_id)
             
-            interaction = db.query(BotInteraction).filter_by(
-                application_id=data['application_id']
-            ).first()
-            
-            if interaction:
-                interaction.current_question_id = next_question_id
-                interaction.last_active = datetime.utcnow()
-                db.commit()
-
-            await state.update_data(current_question=current_idx + 1)
+            data['current_question'] += 1
+            await _update_interaction_state(data['application_id'], data)
+            await state.update_data(current_question=data['current_question'])
             await _show_question(next_question, callback.message, state)
         
         await callback.answer()
@@ -328,13 +359,38 @@ async def handle_next_question(callback: CallbackQuery, state: FSMContext):
         await _handle_db_error(callback.message)
 
 
+async def handle_next_question_auto(message: Message, state: FSMContext):
+    try:
+        data = await _get_current_interaction_data(state)
+        with Session() as db:
+            next_question = db.query(BotQuestion).get(data['questions'][data['current_question'] + 1])
+            await state.update_data(current_question=data['current_question'] + 1)
+            await _show_question(next_question, message, state)
+    except Exception as e:
+        logger.error(f"Auto next error: {str(e)}")
+        await _handle_db_error(message)
+
+
+@candidate_router.callback_query(F.data.startswith("review_page_"))
+async def handle_review_pagination(callback: CallbackQuery, state: FSMContext):
+    '''Обработка нумерации на просмотре ответов'''
+    try:
+        page = int(callback.data.split("_")[-1])
+        await handle_review(callback.message, state, page)
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Pagination error: {str(e)}")
+        await _handle_db_error(callback.message)
+
+
+# --------------------------
+#  Answer Handling
+# --------------------------
 @candidate_router.message(CandidateStates.answering)
 async def handle_text_answer(message: Message, state: FSMContext):
-    '''Обработка ответа кандидата при свободном ответе или файле'''
     try:
-        data = await state.get_data()
-        current_idx = data['current_question']
-        question_id = data['questions'][current_idx]
+        data = await _get_current_interaction_data(state)
+        question_id = data['questions'][data['current_question']]
         
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
@@ -342,51 +398,53 @@ async def handle_text_answer(message: Message, state: FSMContext):
                 await message.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
 
-            if question.expected_format == AnswerFormat.FILE:
-                await message.answer(msg_templates.FILE_EXPECTED)
-                return
-                
             if question.expected_format == AnswerFormat.CHOICE:
                 await message.answer("ℹ️ Пожалуйста, выберите вариант из предложенных")
                 return
 
-            answer_content = message.document.file_id if message.document else message.text
-            # Обновляем записи об ответах кандидата
-            new_answers = {**data['answers'], str(question_id): answer_content}
-            await state.update_data(answers=new_answers)
-            
-            interaction = db.query(BotInteraction).filter_by(
-                application_id=data['application_id']
-            ).first()
-            
-            if interaction:
-                interaction.answers = new_answers
-                interaction.last_active = datetime.utcnow()
-                db.commit()
+            answer_content = await _process_answer_content(message, question)
+            if not answer_content:
+                return
 
-            await message.answer(f"✅ Ответ сохранен: {message.text}")
+            await _update_answer(state, data, question_id, answer_content)
             
             if await state.get_state() == CandidateStates.editing:
                 await handle_review(message, state)
                 await state.set_state(CandidateStates.review)
-            elif current_idx < len(data['questions']) - 1:
+            elif data['current_question'] < len(data['questions']) - 1:
                 await handle_next_question_auto(message, state)
             else:
                 await handle_review(message, state)
 
     except Exception as e:
-        logger.error(f"Answer handling error: {str(e)}")
+        logger.error(f"Answer error: {str(e)}")
         await _handle_db_error(message)
+
+
+async def _process_answer_content(message: Message, question: BotQuestion):
+    if question.expected_format == AnswerFormat.FILE:
+        if not message.document:
+            await message.answer(msg_templates.FILE_EXPECTED)
+            return None
+        return f"FILE:{message.document.file_id}"
+    return message.text
+
+
+async def _update_answer(state: FSMContext, data: dict, question_id: int, answer: str):
+    new_answers = {**data['answers'], str(question_id): answer}
+    await state.update_data(answers=new_answers)
+    await _update_interaction_state(data['application_id'], {
+        **data,
+        'answers': new_answers
+    })
 
 
 @candidate_router.callback_query(F.data.startswith("choice_"))
 async def handle_choice_answer(callback: CallbackQuery, state: FSMContext):
-    '''Обработка ответа кандидата при вопросе с выбором'''
     try:
         choice_idx = int(callback.data.split("_")[1])
-        data = await state.get_data()
-        current_idx = data['current_question']
-        question_id = data['questions'][current_idx]
+        data = await _get_current_interaction_data(state)
+        question_id = data['questions'][data['current_question']]
         
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
@@ -395,36 +453,22 @@ async def handle_choice_answer(callback: CallbackQuery, state: FSMContext):
                 return
 
             selected_choice = question.choices[choice_idx]
+            await _update_answer(state, data, question_id, selected_choice)
+            await callback.message.edit_text(f"✅ Вы выбрали: {selected_choice}")
             
-            # Update answers
-            new_answers = {**data['answers'], str(question_id): selected_choice}
-            await state.update_data(answers=new_answers)
-            
-            interaction = db.query(BotInteraction).filter_by(
-                application_id=data['application_id']
-            ).first()
-            
-            if interaction:
-                interaction.answers = new_answers
-                db.commit()
-
-            await callback.message.edit_text(
-                f"✅ Вы выбрали: {selected_choice}"
-            )
-            
-            if current_idx < len(data['questions']) - 1:
+            if data['current_question'] < len(data['questions']) - 1:
                 await handle_next_question_auto(callback.message, state)
             else:
                 await handle_review(callback.message, state)
                 
         await callback.answer()
     except Exception as e:
-        logger.error(f"Choice handling error: {str(e)}")
+        logger.error(f"Choice error: {str(e)}")
         await _handle_db_error(callback.message)
-        
+
 
 # --------------------------
-#  Answer's review and editing handlers
+#  Answer Editing
 # --------------------------
 @candidate_router.callback_query(F.data.startswith("edit_"), CandidateStates.review)
 async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
@@ -437,65 +481,87 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
                 await callback.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
 
-            data = await state.get_data()
+            data = await _get_current_interaction_data(state)
             new_current = data['questions'].index(question_id)
             
             await state.update_data(current_question=new_current)
             await state.set_state(CandidateStates.editing)
             
-            await callback.message.answer(
-                f"✏️ Редактирование вопроса {new_current+1}:\n\n"
-                f"{question.question_text}\n\n"
-                f"Текущий ответ: {data['answers'].get(str(question_id), '❌ Нет ответа')}\n\n"
-                "Отправьте новый ответ:"
-            )
+            if question.expected_format == AnswerFormat.CHOICE and question.choices:
+                keyboard = _build_choice_keyboard(
+                    question.choices, 
+                    "edit_choice", 
+                    "↩️ Назад к обзору",
+                    is_editing=True
+                )
+                await callback.message.edit_text(
+                    f"✏️ Редактирование вопроса {new_current+1}:\n\n"
+                    f"{question.question_text}\n\n"
+                    f"Текущий ответ: {data['answers'].get(str(question_id), '❌ Нет ответа')}",
+                    reply_markup=keyboard
+                )
+            else:
+                await callback.message.edit_text(
+                    f"✏️ Редактирование вопроса {new_current+1}:\n\n"
+                    f"{question.question_text}\n\n"
+                    f"Текущий ответ: {data['answers'].get(str(question_id), '❌ Нет ответа')}\n\n"
+                    "Отправьте новый ответ:",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="↩️ Назад к обзору", callback_data="cancel_edit")]
+                    ])
+                )
             await callback.answer()
     except Exception as e:
-        logger.error(f"Edit review error: {str(e)}")
+        logger.error(f"Edit error: {str(e)}")
         await _handle_db_error(callback.message)
 
 
 @candidate_router.message(CandidateStates.editing)
 async def handle_edit_answer(message: Message, state: FSMContext):
     try:
-        data = await state.get_data()
-        current_idx = data['current_question']
-        question_id = data['questions'][current_idx]
+        data = await _get_current_interaction_data(state)
+        question_id = data['questions'][data['current_question']]
         
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
-            
             if question.expected_format == AnswerFormat.FILE and not message.document:
                 await message.answer(msg_templates.FILE_EXPECTED)
                 return
                 
-            if question.expected_format == AnswerFormat.CHOICE:
-                if message.text not in (question.choices or []):
-                    await message.answer(f"❌ Выберите: {', '.join(question.choices)}")
-                    return
+            answer_content = await _process_answer_content(message, question)
+            if not answer_content:
+                return
 
-            new_answer = message.document.file_id if message.document else message.text
-            new_answers = {**data['answers'], str(question_id): new_answer}
-            
-            await state.update_data(answers=new_answers)
-            
-            interaction = db.query(BotInteraction).filter_by(
-                application_id=data['application_id']
-            ).first()
-            
-            if interaction:
-                interaction.answers = new_answers
-                interaction.last_active = datetime.utcnow()
-                db.commit()
-
-            await message.answer("✅ Ответ успешно обновлен!")
+            await _update_answer(state, data, question_id, answer_content)
             await handle_review(message, state)
             await state.set_state(CandidateStates.review)
 
     except Exception as e:
         logger.error(f"Edit answer error: {str(e)}")
         await _handle_db_error(message)
+
+
+@candidate_router.callback_query(F.data.startswith("edit_choice_"))
+async def handle_edit_choice(callback: CallbackQuery, state: FSMContext):
+    try:
+        choice_idx = int(callback.data.split("_")[-1])
+        data = await _get_current_interaction_data(state)
+        question_id = data['questions'][data['current_question']]
         
+        with Session() as db:
+            question = db.query(BotQuestion).get(question_id)
+            if not question or not question.choices:
+                await callback.answer("❌ Неверный вариант")
+                return
+
+            selected_choice = question.choices[choice_idx]
+            await _update_answer(state, data, question_id, selected_choice)
+            await handle_review(callback.message, state)
+            await callback.answer()
+    except Exception as e:
+        logger.error(f"Edit choice error: {str(e)}")
+        await _handle_db_error(callback.message)
+
 
 @candidate_router.callback_query(F.data == "cancel_edit", CandidateStates.editing)
 async def handle_cancel_edit(callback: CallbackQuery, state: FSMContext):
@@ -505,12 +571,12 @@ async def handle_cancel_edit(callback: CallbackQuery, state: FSMContext):
 
 
 # --------------------------
-#  Form submit handlers
+#  Form Submission
 # --------------------------
 @candidate_router.callback_query(F.data == "submit_answers", CandidateStates.review)
 async def handle_submission(callback: CallbackQuery, state: FSMContext):
     try:
-        data = await state.get_data()
+        data = await _get_current_interaction_data(state)
         
         with Session() as db:
             application = db.query(Application).get(data['application_id'])
@@ -519,29 +585,21 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
                 return
 
             application.status = ApplicationStatus.REVIEW
-            
             interaction = db.query(BotInteraction).filter_by(
                 application_id=data['application_id']
             ).first()
             interaction.state = InteractionState.COMPLETED
             interaction.completed_at = datetime.utcnow()
             
-            # TODO: 
-            # Add GigaChat logic
-            # Correct bot_interaction db records
-            # Add candidate_answer?
-            # Add real notifications
-            hr_specialists = db.query(HrSpecialist).all()
-            
-            for hr in hr_specialists:
+            for hr in db.query(HrSpecialist).all():
                 notification = HrNotification(
                     candidate_id=data['candidate_id'],
                     hr_specialist_id=hr.id,
                     channel='Telegram',
                     sent_data={
-                        "candidate": f"{data['candidate_name']}",
-                        "vacancy": f"{data['vacancy_title']}",
-                        "answers": len(data['answers'])
+                        "candidate": data.get('candidate_name', ''),
+                        "vacancy": data.get('vacancy_title', ''),
+                        "answers": data['answers']
                     },
                     status="new"
                 )
@@ -549,13 +607,14 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
             
             db.commit()
 
-        await callback.message.answer(
-            msg_templates.ON_FORM_SUBMIT
-        )
+        await callback.message.answer(msg_templates.ON_FORM_SUBMIT)
         await state.clear()
         await callback.answer()
 
     except Exception as e:
-        logger.error(f"Submission error: {str(e)}")
+        logger.error(f"Submit error: {str(e)}")
         await _handle_db_error(callback.message, "Ошибка отправки анкеты")
-        
+
+@candidate_router.callback_query(F.data == "noop")
+async def handle_noop(callback: CallbackQuery):
+    await callback.answer()
