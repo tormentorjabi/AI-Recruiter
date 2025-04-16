@@ -45,15 +45,45 @@ async def _show_question(question: BotQuestion, message: Message, state: FSMCont
         current_num = data['current_question'] + 1
         total = len(data['questions'])
         
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="⏭️ Следующий вопрос", callback_data="next_question")],
-            [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
-        ])
+        if question.expected_format == AnswerFormat.CHOICE and question.choices:
+            if len(question.choices) > 4:
+                # Варианты ответов в две колонки, если их больше 4 штук
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text=choice, callback_data=f"choice_{i}") 
+                     for choice in question.choices[i:i+2]]
+                    for i in range(0, len(question.choices), 2)
+                ] + [
+                    [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
+                ])
+            else:
+                # Варианты ответов в одну колонку иначе
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text=choice, callback_data=f"choice_{i}")]
+                    for i, choice in enumerate(question.choices)
+                ] + [
+                    [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
+                ])
+
+            await message.answer(
+                f"Вопрос {current_num}/{total} (выберите вариант):\n\n{question.question_text}",
+                reply_markup=keyboard
+            )
+        else:
+            format_hint = {
+                AnswerFormat.TEXT: "✍️ Введите текстовый ответ",
+                AnswerFormat.FILE: "📎 Отправьте файл"
+            }.get(question.expected_format, "")
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⏭️ Следующий вопрос", callback_data="next_question")],
+                [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
+            ])
+            
+            await message.answer(
+                f"Вопрос {current_num}/{total}:\n\n{question.question_text}\n\n{format_hint}",
+                reply_markup=keyboard
+            )
         
-        await message.answer(
-            f"Вопрос {current_num}/{total}:\n\n{question.question_text}",
-            reply_markup=keyboard
-        )
     except Exception as e:
         logger.error(f"Error showing question: {str(e)}")
         raise
@@ -207,7 +237,7 @@ async def candidate_start(message: Message, state: FSMContext):
                         msg_templates.CANDIDATE_BOT_INTERACTION_SESSION_TIMEOUT
                     )
                     return
-                
+
                 state_data = {
                     'candidate_id': candidate.id,
                     'candidate_name': candidate.full_name,
@@ -300,7 +330,7 @@ async def handle_next_question(callback: CallbackQuery, state: FSMContext):
 
 @candidate_router.message(CandidateStates.answering)
 async def handle_text_answer(message: Message, state: FSMContext):
-    '''Обработка ответа кандидата'''
+    '''Обработка ответа кандидата при свободном ответе или файле'''
     try:
         data = await state.get_data()
         current_idx = data['current_question']
@@ -317,12 +347,12 @@ async def handle_text_answer(message: Message, state: FSMContext):
                 return
                 
             if question.expected_format == AnswerFormat.CHOICE:
-                if message.text not in (question.choices or []):
-                    await message.answer(f"❌ Выберите: {', '.join(question.choices)}")
-                    return
+                await message.answer("ℹ️ Пожалуйста, выберите вариант из предложенных")
+                return
 
+            answer_content = message.document.file_id if message.document else message.text
             # Обновляем записи об ответах кандидата
-            new_answers = {**data['answers'], str(question_id): message.text}
+            new_answers = {**data['answers'], str(question_id): answer_content}
             await state.update_data(answers=new_answers)
             
             interaction = db.query(BotInteraction).filter_by(
@@ -348,6 +378,50 @@ async def handle_text_answer(message: Message, state: FSMContext):
         logger.error(f"Answer handling error: {str(e)}")
         await _handle_db_error(message)
 
+
+@candidate_router.callback_query(F.data.startswith("choice_"))
+async def handle_choice_answer(callback: CallbackQuery, state: FSMContext):
+    '''Обработка ответа кандидата при вопросе с выбором'''
+    try:
+        choice_idx = int(callback.data.split("_")[1])
+        data = await state.get_data()
+        current_idx = data['current_question']
+        question_id = data['questions'][current_idx]
+        
+        with Session() as db:
+            question = db.query(BotQuestion).get(question_id)
+            if not question or not question.choices:
+                await callback.answer("❌ Неверный вариант")
+                return
+
+            selected_choice = question.choices[choice_idx]
+            
+            # Update answers
+            new_answers = {**data['answers'], str(question_id): selected_choice}
+            await state.update_data(answers=new_answers)
+            
+            interaction = db.query(BotInteraction).filter_by(
+                application_id=data['application_id']
+            ).first()
+            
+            if interaction:
+                interaction.answers = new_answers
+                db.commit()
+
+            await callback.message.edit_text(
+                f"✅ Вы выбрали: {selected_choice}"
+            )
+            
+            if current_idx < len(data['questions']) - 1:
+                await handle_next_question_auto(callback.message, state)
+            else:
+                await handle_review(callback.message, state)
+                
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Choice handling error: {str(e)}")
+        await _handle_db_error(callback.message)
+        
 
 # --------------------------
 #  Answer's review and editing handlers
