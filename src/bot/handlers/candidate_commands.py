@@ -1,4 +1,5 @@
 import logging
+import src.bot.utils.message_templates as msg_templates
 
 from aiogram import Router, F
 from aiogram.filters import Command
@@ -22,6 +23,9 @@ from src.database.models import (
 from src.database.models.application import ApplicationStatus
 from src.database.models.bot_interaction import InteractionState
 from src.database.models.bot_question import AnswerFormat
+
+from src.gigachat_module.telegram_screening import TelegramScreening
+
 
 logger = logging.getLogger(__name__)
 candidate_router = Router()
@@ -56,7 +60,7 @@ async def _show_question(question: BotQuestion, message: Message, state: FSMCont
 
 
 async def _handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
-    """Handle database errors consistently"""
+    '''Обработка ошибок БД'''
     await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
     logger.error(error_msg)
 
@@ -142,8 +146,8 @@ async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMCo
 
         await state.clear()
         await message.answer(
-            "❌ Процесс прохождения отменен. "
-            "Для возобновления используйте /start"
+            msg_templates.CANDIDATE_CANCELLED_FORM,
+            parse_mode="Markdown"
         )
         
     except Exception as e:
@@ -158,16 +162,15 @@ async def candidate_start(message: Message, state: FSMContext):
         telegram_id = str(message.from_user.id)
         
         with Session() as db:
-            # Security check and candidate validation
             candidate = db.query(Candidate).filter(
                 Candidate.telegram_id == telegram_id
             ).first()
             
             if not candidate:
-                await message.answer("⚠️ Вы не зарегистрированы как соискатель")
+                await message.answer(msg_templates.CANDIDATE_NOT_FOUND)
+                await message.answer(msg_templates.NOT_REGISTERED_AS_HR)
                 return
 
-            # Validate active application
             application = db.query(Application).filter(
                 and_(
                     Application.candidate_id == candidate.id,
@@ -177,10 +180,7 @@ async def candidate_start(message: Message, state: FSMContext):
             
             if not application:
                 await message.answer(
-                    "❌ Нет активных откликов по вакансиям, "
-                    "которые нуждались бы в прохождении опроса.\n\n"
-                    "Если вы недавно заполняли форму, "
-                    "пожалуйста, дождитесь нашего ответа!"
+                    msg_templates.CANDIDATE_APPLICATIONS_NOT_FOUND
                 )
                 return
 
@@ -193,7 +193,9 @@ async def candidate_start(message: Message, state: FSMContext):
             ).order_by(BotQuestion.order).all()
             
             if not questions:
-                await message.answer("⚠️ Для вакансии нет вопросов")
+                await message.answer(
+                    msg_templates.VACANCY_QUESTIONS_NOT_FOUND
+                )
                 return
 
             if interaction and interaction.state == InteractionState.PAUSED:
@@ -201,7 +203,9 @@ async def candidate_start(message: Message, state: FSMContext):
                 if (datetime.utcnow() - interaction.last_active) > timedelta(hours=12):
                     db.delete(interaction)
                     db.commit()
-                    await message.answer("❌ Сессия истекла, начните заново")
+                    await message.answer(
+                        msg_templates.CANDIDATE_BOT_INTERACTION_SESSION_TIMEOUT
+                    )
                     return
                 
                 state_data = {
@@ -242,20 +246,11 @@ async def candidate_start(message: Message, state: FSMContext):
             db.commit()
             await state.set_data(state_data)
             
-            # TODO:
-            # Вывести все сбщ такого плана в шаблонки, вместе с вопросами
-            # для GigaChat
             await message.answer(
-                f"Приветствуем вас, {candidate.full_name}!\n\n"
-                f"В рамках вашего отклика по вакансии: `{application.vacancy.title}` "
-                f"вам необходимо пройти опрос, состоящий из `{len(questions)} вопросов`.\n"
-                "Без прохождения данного опроса, мы не сможем вынести окончательное решение "
-                "по вашей кандидатуре.\n\n"
-                "Перед отправкой анкеты, вы сможете увидеть все ответы, данные вами, "
-                "а также при необходимости изменить каждый из них.\n\n"
-                "Вы не ограничены по времени\n"
-                "Вы в любой момент можете прервать сессию прохождения опроса\n\n"
-                "Удачи 👍🏻",
+                msg_templates.get_candidate_on_start_bot_interaction_message(
+                    db_candidate_full_name=candidate.full_name,
+                    vacancy_title=application.vacancy.title,
+                    questions_length=len(questions)),
                 parse_mode="Markdown"
             )
             await _show_question(resume_question, message, state)
@@ -314,11 +309,11 @@ async def handle_text_answer(message: Message, state: FSMContext):
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
             if not question:
-                await message.answer("❌ Вопрос не найден")
+                await message.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
 
             if question.expected_format == AnswerFormat.FILE:
-                await message.answer("❌ Ожидается файл")
+                await message.answer(msg_templates.FILE_EXPECTED)
                 return
                 
             if question.expected_format == AnswerFormat.CHOICE:
@@ -365,7 +360,7 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
             if not question:
-                await callback.answer("❌ Вопрос не найден")
+                await callback.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
 
             data = await state.get_data()
@@ -397,7 +392,7 @@ async def handle_edit_answer(message: Message, state: FSMContext):
             question = db.query(BotQuestion).get(question_id)
             
             if question.expected_format == AnswerFormat.FILE and not message.document:
-                await message.answer("❌ Ожидается файл")
+                await message.answer(msg_templates.FILE_EXPECTED)
                 return
                 
             if question.expected_format == AnswerFormat.CHOICE:
@@ -446,7 +441,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
         with Session() as db:
             application = db.query(Application).get(data['application_id'])
             if application.status != ApplicationStatus.ACTIVE:
-                await callback.answer("⚠️ Вы уже отправили эту анкету")
+                await callback.answer(msg_templates.FORM_ALREADY_SUBMITTED)
                 return
 
             application.status = ApplicationStatus.REVIEW
@@ -481,7 +476,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
             db.commit()
 
         await callback.message.answer(
-            "✅ Анкета успешно отправлена! Мы свяжемся с вами по результатам."
+            msg_templates.ON_FORM_SUBMIT
         )
         await state.clear()
         await callback.answer()
