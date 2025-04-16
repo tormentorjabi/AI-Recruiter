@@ -3,7 +3,8 @@ from sqlalchemy import (
     Enum,
     Integer, 
     Text,
-    ForeignKey
+    ForeignKey,
+    JSON
 )
 from enum import Enum as PyEnum
 from sqlalchemy.orm import relationship
@@ -14,7 +15,7 @@ class AnswerFormat(PyEnum):
     TEXT = "text"
     FILE = "file"
     CHOICE = "choice"
-
+    
 class BotQuestion(Base):
     """
     Модель вопроса из банка вопросов для Telegram бота
@@ -24,6 +25,7 @@ class BotQuestion(Base):
         question_text (text): Текст вопроса
         order (int): Порядок вопроса в сценарии
         expected_format (enum): Ожидаемый тип ответа ('text' / 'file' / 'choice')
+        choices (JSON): Варианты ответа при expected_format = 'choice'
     """
     __tablename__ = 'bot_questions'
     
@@ -32,6 +34,7 @@ class BotQuestion(Base):
     question_text = Column(Text)
     order = Column(Integer)
     expected_format = Column(Enum(AnswerFormat), nullable=False)
+    choices = Column(JSON, nullable=True)
     
     interactions = relationship("BotInteraction", back_populates="current_question")
     answers = relationship("CandidateAnswer", back_populates="question")
