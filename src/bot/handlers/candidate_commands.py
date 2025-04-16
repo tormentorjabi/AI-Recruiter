@@ -31,6 +31,16 @@ class CandidateStates(StatesGroup):
     editing = State()
 
 
+'''
+    TODO:
+    - Не работает изменение текстовых вопросов:
+        / ошибка: "Review error: Telegram server says - Bad Request: message can't be edited"
+    - Сделать mock запросов в GigaChat:
+        / проверить в каком формате хранятся ответы кандидата перед отправкой
+        / использовать TelegramScreening
+    - Добавить реальные уведомления для HR по результатам анализа
+'''
+
 # --------------------------
 #  Core Utilities
 # --------------------------
