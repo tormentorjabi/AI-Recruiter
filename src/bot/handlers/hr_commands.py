@@ -1,3 +1,5 @@
+import src.bot.utils.message_templates as msg_templates
+
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -6,7 +8,6 @@ from aiogram.types import Message
 
 from src.database.session import Session
 from src.database.models import HrSpecialist
-
 
 hr_commands_router = Router()
 
@@ -25,22 +26,14 @@ async def toggle_work_mode(
         ).first()
 
         if not hr:
-            await message.answer(
-                "❌ Вы не зарегистрированы как HR-специалист.\n"
-                "Если вы желаете зарегистрироваться как HR, запросите "
-                "токен регистрации у вашего администратора и выполните "
-                "команду /register_hr"
-            )
+            await message.answer(msg_templates.NOT_REGISTERED_AS_HR)
             return
         
         hr_work_mode = hr.work_mode
         
         await state.update_data(hr_id=hr.id)
         await message.answer(
-                "Режим получения уведомлений:\n"
-                f"{'✅ Активен' if hr_work_mode else '❌ Не активен'}\n\n"
-                "Хотите сменить режим?\n"
-                "Введите [Да/Нет] для подтверждения:"
+                msg_templates.confirm_change_work_mode_message(work_mode=hr_work_mode),
             )
         await state.set_state(ToggleWorkModeStates.waiting_for_confirmation)
         
@@ -56,7 +49,7 @@ async def confirm_change_work_mode(message: Message, state: FSMContext):
         hr = db.query(HrSpecialist).get(data['hr_id'])
     
         if not hr:
-            await message.answer("❌ HR-специалист не найден в базе данных")
+            await message.answer(msg_templates.HR_NOT_FOUND_IN_DATABASE)
             await state.clear()
             return
 
@@ -66,9 +59,11 @@ async def confirm_change_work_mode(message: Message, state: FSMContext):
 
         status_text = "Активен" if new_status else "Не активен"
         await message.answer(
-            f"🆕 Режим работы изменен на: `{status_text}`\n"
-            f"Уведомления о кандидатах: {'✅ Включены' if new_status else '❌ Выключены'}",
-            parse_mode="Markdown"
+           msg_templates.work_mode_changed_message(
+               status_text=status_text,
+               status=new_status
+           ),
+           parse_mode="Markdown"
         )
     
     await state.clear()
@@ -78,5 +73,5 @@ async def confirm_change_work_mode(message: Message, state: FSMContext):
     StateFilter(ToggleWorkModeStates.waiting_for_confirmation)
 )
 async def cancel_change_work_mode(message: Message, state: FSMContext):
-    await message.answer("❌ Изменение режима работы отменено пользователем")
+    await message.answer(msg_templates.WORK_MODE_CHANGE_CANCELLED)
     await state.clear()
