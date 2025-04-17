@@ -12,8 +12,10 @@ from datetime import datetime, timedelta
 from src.database.session import Session
 from src.database.models import (
     Candidate, Application, BotQuestion, HrNotification,
-    Vacancy, BotInteraction, HrSpecialist
+    Vacancy, BotInteraction, HrSpecialist, AnalysisResult
 )
+
+from src.bot.utils.bot_answers_json_builder import build_json
 
 from src.database.models.application import ApplicationStatus
 from src.database.models.bot_interaction import InteractionState
@@ -54,6 +56,7 @@ async def _get_current_interaction_data(state: FSMContext):
     return {
         'candidate_id': data.get('candidate_id'),
         'application_id': data.get('application_id'),
+        'vacancy_id': data.get('vacancy_id', ''),
         'current_question': data.get('current_question', 0),
         'questions': data.get('questions', []),
         'answers': data.get('answers', {})
@@ -657,8 +660,21 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
                 db.add(notification)
             
             db.commit()
-
+ 
         await callback.message.answer(msg_templates.ON_FORM_SUBMIT)
+        
+        # Собираем ответы кандидата
+        formatted_answers = build_json(
+            application_id=data.get('application_id', -1),
+            vacancy_id=data.get('vacancy_id', -1)
+        )
+        # Отправляем запросы в GigaChat
+        await handle_proceed_to_llm(
+            candidate_id=data.get('candidate_id', -1),
+            application_id=data.get('application_id', -1),
+            answers=formatted_answers
+        )
+        
         await state.clear()
         await callback.answer()
 
@@ -666,6 +682,58 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
         logger.error(f"Submit error: {str(e)}")
         await _handle_db_error(callback.message, "Ошибка отправки анкеты")
 
+
+# --------------------------
+#  Handle LLM request
+# --------------------------
+async def handle_proceed_to_llm(
+    candidate_id: int,
+    application_id: int,
+    answers: str
+):
+    '''Отправить ответы кандидата в GigaChat и уведомить о результатах HR-специалистов'''
+    # Инициализируем скрининг с Telegam бота
+    tg_screening = TelegramScreening()
+    # Отправляем ответы кандидата на оценку в GigaChat
+    analysis = await tg_screening.conduct_additional_screening(answers)
+    try:
+        with Session() as db:
+            # Сохраняем результаты обработки нейросетью
+            analysis_result = AnalysisResult(
+                candidate_id=candidate_id,
+                application_id=application_id,
+                summary={"Оценка: ": analysis},
+                source="telegram",
+                final_decision="approve",
+                processed_at=datetime.utcnow()
+            )
+            db.add(analysis_result)
+            # Создаем уведомления для HR
+            for hr in db.query(HrSpecialist).all():
+                notification = HrNotification(
+                    candidate_id=candidate_id,
+                    hr_specialist_id=hr.id,
+                    channel='telegram',
+                    sent_data={
+                        "Кандидат": candidate_id,
+                        "Оценка:": analysis,
+                        "Ответы кандидата:": answers
+                    },
+                    status="new",
+                    sent_at=datetime.utcnow()
+                )
+                db.add(notification)
+            
+            db.commit()
+            
+    except Exception as e:
+        logger.error(f'Error occured in handle_proceed_to_llm: {str(e)}')
+        raise
+        
+
+# --------------------------
+#  Handle NO-OP
+# --------------------------
 @candidate_router.callback_query(F.data == "noop")
 async def handle_noop(callback: CallbackQuery):
     '''
