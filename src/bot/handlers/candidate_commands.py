@@ -33,8 +33,6 @@ class CandidateStates(StatesGroup):
 
 '''
     TODO:
-    - Не работает изменение текстовых вопросов:
-        / ошибка: "Review error: Telegram server says - Bad Request: message can't be edited"
     - Сделать mock запросов в GigaChat:
         / проверить в каком формате хранятся ответы кандидата перед отправкой
         / использовать TelegramScreening
@@ -223,7 +221,7 @@ async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMCo
         message = query_or_msg.message if isinstance(query_or_msg, CallbackQuery) else query_or_msg
         data = await state.get_data()
         
-        if data.get('current_question', 0) > 0:
+        if data.get('current_question', 0) >= 0:
             try:
                 with Session() as db:
                     interaction = db.query(BotInteraction).filter_by(
@@ -280,7 +278,7 @@ async def candidate_start(message: Message, state: FSMContext):
 
             interaction = db.query(BotInteraction).filter(
                 BotInteraction.application_id == application.id
-            ).first()
+            ).order_by(BotInteraction.id.asc()).first()
             
             questions = db.query(BotQuestion).filter(
                 BotQuestion.vacancy_id == application.vacancy_id
