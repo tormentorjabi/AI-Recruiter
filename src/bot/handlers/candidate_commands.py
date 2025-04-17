@@ -644,21 +644,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
             ).first()
             interaction.state = InteractionState.COMPLETED
             interaction.completed_at = datetime.utcnow()
-            
-            for hr in db.query(HrSpecialist).all():
-                notification = HrNotification(
-                    candidate_id=data['candidate_id'],
-                    hr_specialist_id=hr.id,
-                    channel='Telegram',
-                    sent_data={
-                        "candidate": data.get('candidate_name', ''),
-                        "vacancy": data.get('vacancy_title', ''),
-                        "answers": data['answers']
-                    },
-                    status="new"
-                )
-                db.add(notification)
-            
+                 
             db.commit()
  
         await callback.message.answer(msg_templates.ON_FORM_SUBMIT)
