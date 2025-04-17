@@ -190,9 +190,9 @@ async def handle_review(message: Message, state: FSMContext, page: int = 0):
             total_pages = (len(questions) + QUESTIONS_PER_PAGE - 1) // QUESTIONS_PER_PAGE
             # Собираем клавиатуру финальной сверки
             keyboard = await _build_review_keyboard(page_questions, page, total_pages)
-            # 
+
             if hasattr(message, 'message_id'):
-                await message.edit_text(f"📝 Ваши ответы:\n\n{content}", reply_markup=keyboard)
+                await message.answer(f"📝 Ваши ответы:\n\n{content}", reply_markup=keyboard)
             else:
                 logger.warning(f'{message} has no "message_id": This behaviour is unexpected!')
                 await message.answer(f"📝 Ваши ответы:\n\n{content}", reply_markup=keyboard)
@@ -526,6 +526,15 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
             await state.update_data(current_question=new_current)
             await state.set_state(CandidateStates.editing)
             
+            edit_text = (
+                f"✏️ Редактирование вопроса {new_current+1}:\n\n"
+                f"{question.question_text}\n\n"
+            )
+            edit_text += (
+                f"Текущий ответ: {data['answers'].get(str(question_id), 'Нет ответа')}"
+            )
+            
+            is_choice_based_question = False
             if question.expected_format == AnswerFormat.CHOICE and question.choices:
                 keyboard = _build_choice_keyboard(
                     question.choices, 
@@ -533,23 +542,24 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
                     "↩️ Назад к обзору",
                     is_editing=True
                 )
-                await callback.message.edit_text(
-                    f"✏️ Редактирование вопроса {new_current+1}:\n\n"
-                    f"{question.question_text}\n\n"
-                    f"Текущий ответ: {data['answers'].get(str(question_id), 'Нет ответа')}",
-                    reply_markup=keyboard
-                )
+                edit_text += ""
+                is_choice_based_question = True
             else:
-                # HERE?
-                await callback.message.edit_text(
-                    f"✏️ Редактирование вопроса {new_current+1}:\n\n"
-                    f"{question.question_text}\n\n"
-                    f"Текущий ответ: {data['answers'].get(str(question_id), 'Нет ответа')}\n\n"
-                    "Отправьте новый ответ:",
-                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="↩️ Назад к обзору", callback_data="cancel_edit")]
-                    ])
-                )
+                edit_text += "\n\nОтправьте новый ответ:"
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="↩️ Назад к обзору", callback_data="cancel_edit")]
+                ])
+
+            try:
+                if is_choice_based_question:
+                    await callback.message.edit_text(edit_text, reply_markup=keyboard)
+                else:
+                    await callback.message.answer(edit_text, reply_markup=keyboard)
+            
+            except Exception as edit_error:
+                logger.warning(f'Could not edit message: {str(edit_error)}')
+                await callback.message.answer(edit_text, reply_markup=keyboard)
+            
             await callback.answer()
     except Exception as e:
         logger.error(f"Edit error: {str(e)}")
@@ -660,4 +670,9 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
 
 @candidate_router.callback_query(F.data == "noop")
 async def handle_noop(callback: CallbackQuery):
+    '''
+        Пустая операция
+        Используется для CallbackQuery которые не требуют обработки
+        Например: кнопка с текущей страницей в меню пагинации
+    '''
     await callback.answer()
