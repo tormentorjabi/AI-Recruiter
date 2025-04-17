@@ -39,7 +39,7 @@ CANDIDATE_CANCELLED_FORM = (
 )
 
 CANDIDATE_NOT_FOUND = (
-    "⚠️ Вы не зарегистрированы как соискатель"
+    "⚠️ Вы не зарегистрированы как соискатель."
 )
 
 CANDIDATE_APPLICATIONS_NOT_FOUND = (
