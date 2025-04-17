@@ -37,8 +37,9 @@ class Application(Base):
     
     candidate = relationship("Candidate", back_populates="applications")
     vacancy = relationship("Vacancy", back_populates="applications")
-    answers = relationship("CandidateAnswer", back_populates="application")
     resume = relationship("Resume", back_populates="application")
     analysis_results = relationship("AnalysisResult", back_populates="application")
     interaction = relationship("BotInteraction", back_populates="application")
+    # Removal's reason: described in CandidateAnswer.py file
+    # answers = relationship("CandidateAnswer", back_populates="application")
     

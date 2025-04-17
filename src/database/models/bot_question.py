@@ -37,6 +37,7 @@ class BotQuestion(Base):
     choices = Column(JSON, nullable=True)
     
     interactions = relationship("BotInteraction", back_populates="current_question")
-    answers = relationship("CandidateAnswer", back_populates="question")
     vacancy = relationship("Vacancy", back_populates="questions")
+    # Removal's reason: described in CandidateAnswer.py file
+    # answers = relationship("CandidateAnswer", back_populates="question")
     
