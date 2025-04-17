@@ -45,11 +45,13 @@ class CandidateStates(StatesGroup):
 #  Core Utilities
 # --------------------------
 async def _handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
+    '''Лог ошибок, возникающих в результате ошибок БД'''
     await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
     logger.error(error_msg)
 
 
 async def _get_current_interaction_data(state: FSMContext):
+    '''Быстрое получение сохраненных значений из FSMContext state'''
     data = await state.get_data()
     return {
         'candidate_id': data.get('candidate_id'),
@@ -61,6 +63,10 @@ async def _get_current_interaction_data(state: FSMContext):
 
 
 async def _update_interaction_state(application_id: int, state_data: dict):
+    '''
+        Обновление BotInteraction instance данных об текущих ответах кандидата,
+        текущем ID вопроса и последней отметке активности
+    '''
     with Session() as db:
         interaction = db.query(BotInteraction).filter_by(
             application_id=application_id
@@ -76,6 +82,7 @@ async def _update_interaction_state(application_id: int, state_data: dict):
 #  Question Display Utilities
 # --------------------------
 def _build_choice_keyboard(choices, callback_prefix, cancel_text="❌ Отменить", is_editing=False):
+    '''Сборка Inline клавиатуры для вопросов с выбором ответа'''
     if len(choices) > 4:
         keyboard = [
             [InlineKeyboardButton(text=choice, callback_data=f"{callback_prefix}_{i}") 
@@ -93,13 +100,39 @@ def _build_choice_keyboard(choices, callback_prefix, cancel_text="❌ Отмен
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
+async def _build_review_keyboard(questions, current_page, total_pages):
+    '''Сборка Inline клавиатуры для меню финальной сверки ответов'''
+    keyboard = [
+        [InlineKeyboardButton(text=f"✏️ Вопрос {i+1 + current_page*5}", callback_data=f"edit_{q.id}")]
+        for i, q in enumerate(questions)
+    ]
+    
+    if total_pages > 1:
+        pagination = []
+        if current_page > 0:
+            pagination.append(InlineKeyboardButton(text="◀️", callback_data=f"review_page_{current_page-1}"))
+        pagination.append(InlineKeyboardButton(text=f"{current_page+1}/{total_pages}", callback_data="noop"))
+        if current_page < total_pages - 1:
+            pagination.append(InlineKeyboardButton(text="▶️", callback_data=f"review_page_{current_page+1}"))
+        keyboard.append(pagination)
+    
+    keyboard.extend([
+        [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data="submit_answers")],
+        [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 async def _show_question(question: BotQuestion, message: Message, state: FSMContext):
+    '''Показать текущий вопрос кандидату'''
     try:
         data = await state.get_data()
         current_num = data['current_question'] + 1
         total = len(data['questions'])
         
         if question.expected_format == AnswerFormat.CHOICE and question.choices:
+            # Для вопросов с вариантами ответов, нужно собрать Inline клавиатуру
             await message.answer(
                 f"Вопрос {current_num}/{total} (выберите вариант):\n\n{question.question_text}",
                 reply_markup=_build_choice_keyboard(question.choices, "choice")
@@ -128,34 +161,40 @@ async def _show_question(question: BotQuestion, message: Message, state: FSMCont
 #  Review Utilities
 # --------------------------
 async def _build_review_content(questions, answers):
+    '''Сборка контента всех ответов кандидата для меню финальной сверки'''
     review_content = []
     for idx, q in enumerate(questions):
-        answer = answers.get(str(q.id), '❌ Нет ответа')
+        answer = answers.get(str(q.id), 'Нет ответа')
         if q.expected_format == AnswerFormat.FILE and answer.startswith("FILE:"):
-            answer = "📎 Прикрепленный файл"
+            answer = "Прикрепленный файл"
         review_content.append(f"{idx+1}. {q.question_text}\nОтвет: {answer}")
     return "\n\n".join(review_content)
 
 
 async def handle_review(message: Message, state: FSMContext, page: int = 0):
+    '''Обработка финальной сверки всех ответов кандидата'''
     try:
         data = await state.get_data()
         QUESTIONS_PER_PAGE = 5
         
         with Session() as db:
+            # Достаем все вопросы по вакансии
             questions = db.query(BotQuestion).filter(
                 BotQuestion.id.in_(data['questions'])
             ).order_by(BotQuestion.order).all()
-            
+            # Собирает данные с ответами
             content = await _build_review_content(questions, data['answers'])
+            # В случае большого количества вопросов, зависит от [QUESTIONS_PER_PAGE]
+            # готовимся к клавиатуре с пагинацией
             page_questions = questions[page*QUESTIONS_PER_PAGE:(page+1)*QUESTIONS_PER_PAGE]
             total_pages = (len(questions) + QUESTIONS_PER_PAGE - 1) // QUESTIONS_PER_PAGE
-            
+            # Собираем клавиатуру финальной сверки
             keyboard = await _build_review_keyboard(page_questions, page, total_pages)
-            
+            # 
             if hasattr(message, 'message_id'):
                 await message.edit_text(f"📝 Ваши ответы:\n\n{content}", reply_markup=keyboard)
             else:
+                logger.warning(f'{message} has no "message_id": This behaviour is unexpected!')
                 await message.answer(f"📝 Ваши ответы:\n\n{content}", reply_markup=keyboard)
             
             await state.set_state(CandidateStates.review)
@@ -173,36 +212,13 @@ async def handle_review(message: Message, state: FSMContext, page: int = 0):
         await _handle_db_error(message)
 
 
-async def _build_review_keyboard(questions, current_page, total_pages):
-    keyboard = [
-        [InlineKeyboardButton(text=f"✏️ Вопрос {i+1 + current_page*5}", callback_data=f"edit_{q.id}")]
-        for i, q in enumerate(questions)
-    ]
-    
-    if total_pages > 1:
-        pagination = []
-        if current_page > 0:
-            pagination.append(InlineKeyboardButton(text="◀️", callback_data=f"review_page_{current_page-1}"))
-        pagination.append(InlineKeyboardButton(text=f"{current_page+1}/{total_pages}", callback_data="noop"))
-        if current_page < total_pages - 1:
-            pagination.append(InlineKeyboardButton(text="▶️", callback_data=f"review_page_{current_page+1}"))
-        keyboard.append(pagination)
-    
-    keyboard.extend([
-        [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data="submit_answers")],
-        [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_process")]
-    ])
-    
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
-
 # --------------------------
 #  Common Handlers
 # --------------------------
 @candidate_router.message(Command('cancel'))
 @candidate_router.callback_query(F.data == 'cancel_process')
 async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMContext):
-    '''Отменить прохождение опросника'''
+    '''Отмена прохождения опроса кандидатом'''
     try:
         message = query_or_msg.message if isinstance(query_or_msg, CallbackQuery) else query_or_msg
         data = await state.get_data()
@@ -285,7 +301,7 @@ async def candidate_start(message: Message, state: FSMContext):
                         msg_templates.CANDIDATE_BOT_INTERACTION_SESSION_TIMEOUT
                     )
                     return
-
+                # Заполняем FSMContext state данными об единице интерактива 
                 state_data = {
                     'candidate_id': candidate.id,
                     'candidate_name': candidate.full_name,
@@ -300,10 +316,12 @@ async def candidate_start(message: Message, state: FSMContext):
                     ),
                     'resumed': True
                 }
+                # Возобновляем интерактив
                 interaction.state = InteractionState.STARTED
                 resume_question = questions[state_data['current_question']]
                 await message.answer("🔄 Возобновляем ваше предыдущее заполнение формы")
             else:
+                # Создаем новую, пустую единицу интерактива
                 interaction = BotInteraction(
                     candidate_id=candidate.id,
                     application_id=application.id,
@@ -312,6 +330,7 @@ async def candidate_start(message: Message, state: FSMContext):
                     state=InteractionState.STARTED
                 )
                 db.add(interaction)
+                # Заполняем FSMContext state данными об единице интерактива
                 state_data = {
                     'candidate_id': candidate.id,
                     'candidate_name': candidate.full_name,
@@ -327,7 +346,7 @@ async def candidate_start(message: Message, state: FSMContext):
             
             db.commit()
             await state.set_data(state_data)
-            
+            # Приветственное сообщение для кандидата
             await message.answer(
                 msg_templates.get_candidate_on_start_bot_interaction_message(
                     db_candidate_full_name=candidate.full_name,
@@ -335,6 +354,7 @@ async def candidate_start(message: Message, state: FSMContext):
                     questions_length=len(questions)),
                 parse_mode="Markdown"
             )
+            # Начинаем показ вопросов из банка вопросов
             await _show_question(resume_question, message, state)
             await state.set_state(CandidateStates.answering)
 
@@ -348,9 +368,10 @@ async def candidate_start(message: Message, state: FSMContext):
 # --------------------------
 @candidate_router.callback_query(F.data == "next_question", CandidateStates.answering)
 async def handle_next_question(callback: CallbackQuery, state: FSMContext):
+    '''Обработка подготовки к следующему вопросу'''
     try:
         data = await _get_current_interaction_data(state)
-        
+        # Если вопросы закончились, переходим к финальной сверке ответов
         if data['current_question'] >= len(data['questions']) - 1:
             return await handle_review(callback.message, state)
 
@@ -370,6 +391,7 @@ async def handle_next_question(callback: CallbackQuery, state: FSMContext):
 
 
 async def handle_next_question_auto(message: Message, state: FSMContext):
+    '''Инициализация показа следующего вопроса из списка вопросов'''
     try:
         data = await _get_current_interaction_data(state)
         with Session() as db:
@@ -383,7 +405,7 @@ async def handle_next_question_auto(message: Message, state: FSMContext):
 
 @candidate_router.callback_query(F.data.startswith("review_page_"))
 async def handle_review_pagination(callback: CallbackQuery, state: FSMContext):
-    '''Обработка нумерации на просмотре ответов'''
+    '''Обработка пагинации на финальной сверке ответов'''
     try:
         page = int(callback.data.split("_")[-1])
         await handle_review(callback.message, state, page)
@@ -398,6 +420,7 @@ async def handle_review_pagination(callback: CallbackQuery, state: FSMContext):
 # --------------------------
 @candidate_router.message(CandidateStates.answering)
 async def handle_text_answer(message: Message, state: FSMContext):
+    '''Обработка ответа кандидата'''
     try:
         data = await _get_current_interaction_data(state)
         question_id = data['questions'][data['current_question']]
@@ -419,11 +442,14 @@ async def handle_text_answer(message: Message, state: FSMContext):
             await _update_answer(state, data, question_id, answer_content)
             
             if await state.get_state() == CandidateStates.editing:
+                # Если пришел из меню финальной сверки, отправляем назад
                 await handle_review(message, state)
                 await state.set_state(CandidateStates.review)
             elif data['current_question'] < len(data['questions']) - 1:
+                # Если ещё есть вопросы, автоматически показывает новый вопрос
                 await handle_next_question_auto(message, state)
             else:
+                # Иначе конец интерактива - идём в меню финальной сверки
                 await handle_review(message, state)
 
     except Exception as e:
@@ -432,6 +458,7 @@ async def handle_text_answer(message: Message, state: FSMContext):
 
 
 async def _process_answer_content(message: Message, question: BotQuestion):
+    '''Получение содержимого ответа, введенного кандидатом'''
     if question.expected_format == AnswerFormat.FILE:
         if not message.document:
             await message.answer(msg_templates.FILE_EXPECTED)
@@ -441,6 +468,7 @@ async def _process_answer_content(message: Message, question: BotQuestion):
 
 
 async def _update_answer(state: FSMContext, data: dict, question_id: int, answer: str):
+    '''Добавление ответа кандидата в список сохраненных ответов'''
     new_answers = {**data['answers'], str(question_id): answer}
     await state.update_data(answers=new_answers)
     await _update_interaction_state(data['application_id'], {
@@ -451,6 +479,7 @@ async def _update_answer(state: FSMContext, data: dict, question_id: int, answer
 
 @candidate_router.callback_query(F.data.startswith("choice_"))
 async def handle_choice_answer(callback: CallbackQuery, state: FSMContext):
+    '''Обработка ответа кандидата на вопрос, с выбором ответа'''
     try:
         choice_idx = int(callback.data.split("_")[1])
         data = await _get_current_interaction_data(state)
@@ -507,14 +536,15 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
                 await callback.message.edit_text(
                     f"✏️ Редактирование вопроса {new_current+1}:\n\n"
                     f"{question.question_text}\n\n"
-                    f"Текущий ответ: {data['answers'].get(str(question_id), '❌ Нет ответа')}",
+                    f"Текущий ответ: {data['answers'].get(str(question_id), 'Нет ответа')}",
                     reply_markup=keyboard
                 )
             else:
+                # HERE?
                 await callback.message.edit_text(
                     f"✏️ Редактирование вопроса {new_current+1}:\n\n"
                     f"{question.question_text}\n\n"
-                    f"Текущий ответ: {data['answers'].get(str(question_id), '❌ Нет ответа')}\n\n"
+                    f"Текущий ответ: {data['answers'].get(str(question_id), 'Нет ответа')}\n\n"
                     "Отправьте новый ответ:",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(text="↩️ Назад к обзору", callback_data="cancel_edit")]
@@ -528,6 +558,7 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
 
 @candidate_router.message(CandidateStates.editing)
 async def handle_edit_answer(message: Message, state: FSMContext):
+    '''Обработчик редактирования ответа кандидата'''
     try:
         data = await _get_current_interaction_data(state)
         question_id = data['questions'][data['current_question']]
@@ -553,6 +584,7 @@ async def handle_edit_answer(message: Message, state: FSMContext):
 
 @candidate_router.callback_query(F.data.startswith("edit_choice_"))
 async def handle_edit_choice(callback: CallbackQuery, state: FSMContext):
+    '''Обработчик редактирования ответа на вопрос с вариантами ответа'''
     try:
         choice_idx = int(callback.data.split("_")[-1])
         data = await _get_current_interaction_data(state)
@@ -585,6 +617,7 @@ async def handle_cancel_edit(callback: CallbackQuery, state: FSMContext):
 # --------------------------
 @candidate_router.callback_query(F.data == "submit_answers", CandidateStates.review)
 async def handle_submission(callback: CallbackQuery, state: FSMContext):
+    '''Обработчик отправки заполненной формы'''
     try:
         data = await _get_current_interaction_data(state)
         
