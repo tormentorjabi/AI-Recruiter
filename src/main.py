@@ -9,7 +9,7 @@ from src.gigachat_module.client import get_gigachat_client
 from langchain_core.messages import HumanMessage, SystemMessage
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
