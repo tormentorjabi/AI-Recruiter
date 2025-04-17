@@ -6,13 +6,40 @@ class TelegramScreening:
     Скрининг ответов кандидата, полученных из Telegram бота
     
     Methods:
-        conduct_additional_screening(candidate_responses, screening_creterias):
+        conduct_additional_screening(candidate_responses, screening_criterias):
             Проводит дополнительную оценку кандидата по ответам из Telegram бота
     """
     def __init__(self):
         # Инициализируем GigaChat клиент
         self.giga = get_gigachat_client()
         
+    def _format_criteria(self, criteria):
+        """
+        Форматировать скрининговые критерии в удовлетворимый вид
+        
+        Args:
+            criteria (dict): Словарь критериев
+        
+        Example:
+            criteria = 
+            {
+                'навыки_коммуникации': 'Ясные и четкие ответы',
+                'технические_познания': 'Продемонстрированы навыки решения проблем'
+            } 
+            
+            result -> criteria_text = (
+                    - Навыки Коммуникации: Ясные и четкие ответы
+                    - Технические Познания: Продемонстрированы навыки решения проблем
+                )
+
+        Returns:
+            str: Текст форматированных критериев
+        """
+        criteria_text = ""
+        for key, value in criteria.items():
+            criteria_text += f"- {key.replace('_', ' ').title()}: {value}\n"
+        return criteria_text
+    
     def conduct_additional_screening(self, candidate_responses, screening_criterias=None) -> str:
         """
         Провести дополнительную оценку кандидата по его ответам из Telegram бота
