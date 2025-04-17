@@ -57,7 +57,6 @@ async def generate_token(message: Message):
         db.add(token)
         db.commit()
     
-    print(generate_token)
     await message.answer(
         msg_templates.registration_token_message(
             generated_token=generated_token
