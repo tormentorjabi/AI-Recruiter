@@ -294,8 +294,8 @@ async def candidate_start(message: Message, state: FSMContext):
                 return
 
             if interaction and interaction.state == InteractionState.PAUSED:
-                # Ответы кандидата хранятся 12 часов, затем форму нужно заполнять с начала
-                if (datetime.utcnow() - interaction.last_active) > timedelta(hours=12):
+                # Ответы кандидата хранятся 24 часов, затем форму нужно заполнять с начала
+                if (datetime.utcnow() - interaction.last_active) > timedelta(hours=24):
                     db.delete(interaction)
                     db.commit()
                     await message.answer(
