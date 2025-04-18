@@ -10,8 +10,8 @@ def get_resume(url):
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     }
     cookies = {
-    "hhuid": "1tiddHEYCySGe98MU3RA",
-    "hhtoken": "JPJIZz08W3KUUjktds4WFLhHgzF9",
+    "hhuid": "",
+    "hhtoken": "",
     }
     response = requests.get(url, headers=headers, cookies=cookies)
 
