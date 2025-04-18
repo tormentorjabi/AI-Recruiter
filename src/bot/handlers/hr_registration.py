@@ -1,3 +1,5 @@
+import src.bot.utils.message_templates as msg_templates
+
 from datetime import datetime
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
@@ -26,15 +28,11 @@ async def start_hr_registration(message: Message, state: FSMContext):
         ).first()
 
         if existing_hr:
-            await message.answer(
-                "⚠️ Вы уже зарегистрированы как HR-специалист!\n"
-                "Если у вас возникли вопросы по работе бота, "
-                "обратитесь к администратору системы."
-            )
+            await message.answer(msg_templates.HR_ALREADY_EXISTS)
             return
 
     await message.answer(
-        'Введите регистрационный токен, выданный администратором:',
+        msg_templates.INPUT_REGISTRATION_TOKEN,
         reply_markup=ReplyKeyboardRemove()
     )
     await state.set_state(HrRegistrationStates.waiting_for_token)
@@ -54,8 +52,7 @@ async def process_token(message: Message, state: FSMContext):
 
         if existing_hr:
             await message.answer(
-                "⚠️ Обнаружена существующая регистрация!\n"
-                "Если это ошибка, обратитесь к администратору."
+                msg_templates.HR_ALREADY_EXISTS_WHILE_IN_REGISTRATION_PROCESS
             )
             await state.clear()
             return
@@ -65,17 +62,15 @@ async def process_token(message: Message, state: FSMContext):
         ).first()
         print(token)
         if not token:
-            await message.answer("❌ Неверный или несуществующий токен")
+            await message.answer(msg_templates.BAD_REGISTRATION_TOKEN)
             return await state.clear()
             
         if token.used_at:
-            await message.answer(
-                "❌ Данный токен уже был задействован. " +
-                "Запросите новый токен у администратора системы")
+            await message.answer(msg_templates.TOKEN_ALREADY_IN_USE)
             return await state.clear()
             
         if token.expires_at < datetime.utcnow():
-            await message.answer("❌ Срок действия токена истек")
+            await message.answer(msg_templates.TOKEN_EXPIRED)
             return await state.clear()
             
         await state.update_data(token_id=token.id)
@@ -104,7 +99,7 @@ async def process_full_name(message: Message, state: FSMContext):
             token = db.query(RegistrationToken).get(token_id)
             
             if not token or token.used_at or token.expires_at < datetime.utcnow():
-                await message.answer("❌ Срок действия токена истёк. Начните регистрацию заново.")
+                await message.answer(msg_templates.TOKEN_EXPIRED)
                 return await state.clear()
             
             new_hr = HrSpecialist(
@@ -125,25 +120,20 @@ async def process_full_name(message: Message, state: FSMContext):
             db.commit()
             
     except IntegrityError as e:
-        await message.answer(
-            "❌ Ошибка регистрации.\n"
-            "Похоже, вы уже зарегистрированы в системе."
-        )
+        await message.answer(msg_templates.HR_ALREADY_EXISTS)
         await state.clear()
         return
     
     await message.answer(
-        "✅ Регистрация успешно завершена!\n"
-        f"Добро пожаловать, {hr_full_name}!\n"
-        "Чтобы начать получать уведомления о новых кандидатах "
-        "воспользуйтесь командой /change_work_mode"
+        msg_templates.hr_registered_message(hr_full_name=hr_full_name)
     )
             
     await message.bot.send_message(
         ADMIN_CHANNEL_ID,
-        f"🆕 Новый HR зарегистрирован: "
-        f"[{hr_full_name}](tg://user?id={hr_telegram_id})\n"
-        f"ID: `{hr_telegram_id}`",
+        msg_templates.hr_registered_notification_message(
+            hr_full_name=hr_full_name,
+            telegram_id=hr_telegram_id
+        ),
         parse_mode="MarkdownV2"
     )
             

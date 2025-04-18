@@ -14,20 +14,20 @@ if DATABASE_URL.startswith('sqlite'):
     engine = create_engine(
         DATABASE_URL,
         connect_args={"check_same_thread": False},
-        echo=True  # Only for development
+        echo=False  # Only for development
     )
 else:
     engine = create_engine(
         DATABASE_URL,
         pool_size=5,
         max_overflow=10,
-        echo=True
+        echo=False
     )
 
 Base = declarative_base()
 
 Session = sessionmaker(
-    autoflush=False, 
+    autoflush=False,
     bind=engine
 )
 

@@ -1,3 +1,5 @@
+import src.bot.utils.message_templates as msg_templates
+
 from aiogram import F
 from aiogram import Router
 from aiogram.types import Message
@@ -27,13 +29,12 @@ async def generate_token(message: Message):
     # Thus, user warning message is not really needed.
     if message.chat.id != ADMIN_CHANNEL_ID:
         await message.answer(
-            f"Вызов команды из этого чата недоступен",
+            msg_templates.ACCESS_RESTRICTED,
         )
         return
     
     await message.answer(
-        f"Запрос получен, ожидайте\n",
-        parse_mode="Markdown"
+        msg_templates.COMMAND_ACCEPTED
     )
     
     with Session() as db:
@@ -51,14 +52,15 @@ async def generate_token(message: Message):
             db.commit()
     
         token = RegistrationToken.generate_token(admin.id)
-        generate_token = token.token
+        generated_token = token.token
         
         db.add(token)
         db.commit()
     
     await message.answer(
-        f"Токен для регистрации HR-специалиста (активен 24ч):\n"
-        f"`{generate_token}`",
+        msg_templates.registration_token_message(
+            generated_token=generated_token
+        ),
         parse_mode="Markdown"
     )
 
@@ -70,7 +72,7 @@ async def generate_token(message: Message):
 async def get_hr_list(message: Message):
     if message.chat.id != ADMIN_CHANNEL_ID:
         await message.answer(
-            f"Вызов команды из этого чата недоступен",
+            msg_templates.ACCESS_RESTRICTED,
         )
         return
     
@@ -81,19 +83,19 @@ async def get_hr_list(message: Message):
         
         if not hrs:
             await message.answer(
-                f"❌ В системе нет зарегистрированных HR-специалистов\n\n"
-                f"Для регистрации, воспользуйтесь командами создания токенов "
-                f"и раздайте их сотрудникам!"
+                msg_templates.NO_HRS_TO_LIST
             )
             return
             
         response = "Список зарегистрированных HR-специалистов:\n\n"
         for hr in hrs:
             response += (
-                f"• {hr.full_name}\n"
-                f"  ID: `{hr.telegram_id}`\n"
-                f"  Дата регистрации: {hr.created_at.strftime('%d.%m.%Y %H:%M')}\n"
-                f"  Текущий режим работы: `{"Активен" if hr.work_mode else "Не активен"}`\n\n"    
+                msg_templates.list_hr_instance_info_message(
+                    hr_full_name=hr.full_name,
+                    hr_telegram_id=hr.telegram_id,
+                    hr_created_at=hr.created_at.strftime('%d.%m.%Y %H:%M'),
+                    hr_work_mode=hr.work_mode
+                )
             )
         
         await message.answer(response, parse_mode="Markdown")
@@ -109,7 +111,7 @@ async def delete_hr(
 ):
     if message.chat.id != ADMIN_CHANNEL_ID:
         await message.answer(
-            f"Вызов команды из этого чата недоступен",
+            msg_templates.ACCESS_RESTRICTED,
         )
         return
     
@@ -117,8 +119,7 @@ async def delete_hr(
     
     if not args:
         await message.answer(
-            "❌ Использование: /delete_hr <Telegram ID HR-специалиста>\n"
-            "Пример: /delete_hr 123456789"
+            msg_templates.SHOW_DELETE_HR_COMMAND_HELPER
         )
         return
 
@@ -126,7 +127,7 @@ async def delete_hr(
 
     if telegram_id == str(ADMIN_USER_ID):
         await message.answer(
-            "❌ Предотвращено удаление системного администратора"
+           msg_templates.SYSTEM_ADMIN_DELETE_PREVENTED
         )
         return
     
@@ -138,21 +139,20 @@ async def delete_hr(
         
         if not hr:
             await message.answer(
-                f"❌ HR-специалист с ID `{telegram_id}` не найден\n",
+                msg_templates.hr_with_id_not_found_message(telegram_id=telegram_id),
                 parse_mode="Markdown"
             )
             await message.answer(
-                f"Найти ID необходимого сотрудника можно с помощью команды: "
-                f"/list_hr"
+                msg_templates.SHOW_LIST_HR_COMMAND_HELPER
             )
             return
         
         await state.update_data(hr_id=hr.id, telegram_id=telegram_id)
         await message.answer(
-            f"⚠️ Вы уверены, что хотите удалить HR-специалиста:\n"
-            f"Имя: {hr.full_name}\n"
-            f"ID: {telegram_id}\n\n"
-            "Введите [Да/Нет] для подтверждения:"
+            msg_templates.confirm_delete_hr_message(
+                hr_full_name=hr.full_name,
+                telegram_id=telegram_id
+            )
         )
         await state.set_state(DeleteHRStates.waiting_for_confirmation)
 
@@ -168,7 +168,7 @@ async def confirm_delete(message: Message, state: FSMContext):
         hr = db.query(HrSpecialist).get(data['hr_id'])
 
         if not hr:
-            await message.answer("❌ HR-специалист не найден в базе данных")
+            await message.answer(msg_templates.HR_NOT_FOUND_IN_DATABASE)
             await state.clear()
             return
 
@@ -177,7 +177,10 @@ async def confirm_delete(message: Message, state: FSMContext):
         db.commit()
 
         await message.answer(
-            f"✅ HR-специалист {hr.full_name} (ID: {data['telegram_id']}) удален",
+            msg_templates.hr_deleted_message(
+                hr_full_name=hr.full_name,
+                telegram_id=data['telegram_id']
+            ),
             parse_mode="Markdown"
         )
 
@@ -188,5 +191,5 @@ async def confirm_delete(message: Message, state: FSMContext):
     StateFilter(DeleteHRStates.waiting_for_confirmation)
 )
 async def cancel_delete(message: Message, state: FSMContext):
-    await message.answer("❌ Удаление отменено пользователем")
+    await message.answer(msg_templates.HR_DELETE_CANCELLED)
     await state.clear()
