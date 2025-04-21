@@ -16,6 +16,7 @@ from src.database.models import (
 )
 
 from src.bot.utils.bot_answers_json_builder import build_json
+from src.bot.utils.schedule_form_reminder import schedule_form_reminder
 
 from src.database.models.application import ApplicationStatus
 from src.database.models.bot_interaction import InteractionState
@@ -133,9 +134,10 @@ async def _show_question(question: BotQuestion, message: Message, state: FSMCont
         total = len(data['questions'])
         
         if question.expected_format == AnswerFormat.CHOICE and question.choices:
-            # Для вопросов с вариантами ответов, нужно собрать Inline клавиатуру
+            # Для вопросов с вариантами ответов, нужно собрать Inline клавиатуру с вариантами
+            # ответов
             await message.answer(
-                f"Вопрос {current_num}/{total} (выберите вариант):\n\n{question.question_text}",
+                f"Вопрос {current_num}/{total}:\n\n{question.question_text}\n\n🎯 Выберите вариант ответа",
                 reply_markup=_build_choice_keyboard(question.choices, "choice")
             )
         else:
@@ -236,6 +238,15 @@ async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMCo
                         interaction.state = InteractionState.PAUSED
                         interaction.current_question_id = data['questions'][data['current_question']]
                         db.commit()
+                        
+                        # Создаем напоминание для пользователя (default = 30 минут)
+                        bot = message.bot
+                        user_id = message.chat.id
+                        await schedule_form_reminder(
+                            bot=bot,
+                            user_id=user_id,
+                            application_id=data['application_id']
+                        )
             except Exception as e:
                 logger.error(f"Error saving paused state: {str(e)}")
 
@@ -328,7 +339,8 @@ async def candidate_start(message: Message, state: FSMContext):
                     application_id=application.id,
                     current_question_id=questions[0].id,
                     vacancy_id=application.vacancy_id,
-                    state=InteractionState.STARTED
+                    state=InteractionState.STARTED,
+                    last_active=datetime.utcnow()
                 )
                 db.add(interaction)
                 # Заполняем FSMContext state данными об единице интерактива
@@ -690,6 +702,8 @@ async def handle_proceed_to_llm(
                 application_id=application_id,
                 summary={"Оценка: ": analysis},
                 source="telegram",
+                # TODO:
+                # - Решение должно зависеть от оценки GigaChat
                 final_decision="approve",
                 processed_at=datetime.utcnow()
             )
@@ -702,11 +716,9 @@ async def handle_proceed_to_llm(
                     channel='telegram',
                     sent_data={
                         "Кандидат": candidate_id,
-                        "Оценка:": analysis,
-                        "Ответы кандидата:": answers
+                        "Оценка:": analysis
                     },
-                    status="new",
-                    sent_at=datetime.utcnow()
+                    status="new"
                 )
                 db.add(notification)
             
