@@ -18,6 +18,7 @@ async def main() -> None:
     try:
         commands = [
             BotCommand(command='/start', description='Запуск бота'),
+            BotCommand(command='/cancel', description='Отменить процесс заполнение анкеты (для соискателя по вакансии)'),
             BotCommand(command='/register_hr', description='Регистрация (для HR-специалиста)'),
             BotCommand(command='/change_work_mode', description='Сменить режим работы (для HR-специалиста)'),
             BotCommand(command='/delete_hr', description='Удаление HR-специалиста (для Админа)'),
