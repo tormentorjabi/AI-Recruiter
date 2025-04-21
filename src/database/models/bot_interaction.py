@@ -28,7 +28,6 @@ class BotInteraction(Base):
         current_question_id (int): FK на текущий вопрос из банка вопросов
         application_id (int): FK на отклик
         vacancy_id (int): FK на вакансию
-        current_step (int): Номер текущего шага
         answers (JSON): Промежуточные ответы {question_id: answer_text}\
         state (enum): Статус интерактива
         started_at (datetime): Время начала интерактива
@@ -42,7 +41,6 @@ class BotInteraction(Base):
     application_id = Column(Integer, ForeignKey('applications.id'), nullable=False)
     current_question_id = Column(Integer, ForeignKey('bot_questions.id'))
     vacancy_id = Column(Integer, ForeignKey('vacancies.id'))
-    current_step = Column(Integer, default=0)
     answers = Column(JSON, default={})
     state = Column(Enum(InteractionState), default=InteractionState.STARTED)
     started_at = Column(DateTime, default=datetime.utcnow)

@@ -5,7 +5,9 @@ from aiogram.types import BotCommand
 from dotenv import load_dotenv
 
 from src.bot.core.bot import bot, dp
-from src.gigachat_module.custom_llm_task import custom_llm_task_loop
+from src.bot.utils.check_abandoned_forms import check_abandoned_forms
+# [DEV MODE ONLY]
+# from src.gigachat_module.custom_llm_task import custom_llm_task_loop
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -18,6 +20,7 @@ async def main() -> None:
     try:
         commands = [
             BotCommand(command='/start', description='Запуск бота'),
+            BotCommand(command='/cancel', description='Отменить процесс заполнение анкеты (для соискателя по вакансии)'),
             BotCommand(command='/register_hr', description='Регистрация (для HR-специалиста)'),
             BotCommand(command='/change_work_mode', description='Сменить режим работы (для HR-специалиста)'),
             BotCommand(command='/delete_hr', description='Удаление HR-специалиста (для Админа)'),
@@ -29,16 +32,19 @@ async def main() -> None:
             Сборка основных корутин приложения:
                 - set_bot_commands: меню всплывающих команд Telegram бота.
                 - bot_task: основной цикл работы Telegram бота, запуск получения событий.
+                - check_abandoned_forms: проверка брошенных анкет и отправка напоминаний.
                 - direct_prompts_to_gigachat: прямое общение с моделью GigaChat [DEV MODE ONLY]
         ''' 
         set_bot_commands = asyncio.create_task(bot.set_my_commands(commands=commands))
         bot_task = asyncio.create_task(dp.start_polling(bot))
+        abandoned_forms_checks = asyncio.create_task(check_abandoned_forms(bot=bot, delay_minutes=30))
         # [DEV MODE ONLY]
         # direct_prompts_to_gigachat = asyncio.create_task(custom_llm_task_loop()) 
 
         await asyncio.gather(
             set_bot_commands,
             bot_task,
+            abandoned_forms_checks,
             # [DEV MODE ONLY]
             # direct_prompts_to_gigachat
         )
