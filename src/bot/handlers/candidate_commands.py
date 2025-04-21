@@ -51,6 +51,20 @@ async def _handle_db_error(message: Message, error_msg: str = "Произошл�
     logger.error(error_msg)
 
 
+async def _update_last_active(candidate_id: int, application_id: int):
+    try:
+        with Session() as db:
+            interaction = db.query(BotInteraction).filter_by(
+                candidate_id=candidate_id,
+                application_id=application_id
+            ).first()
+            if interaction:
+                interaction.last_active = datetime.utcnow()
+                db.commit()
+    except Exception as e:
+        logger.error(f"Error updating last_active: {str(e)}")
+
+
 async def _get_current_interaction_data(state: FSMContext):
     '''Быстрое получение сохраненных значений из FSMContext state'''
     data = await state.get_data()
@@ -290,6 +304,11 @@ async def candidate_start(message: Message, state: FSMContext):
                 )
                 return
 
+            await _update_last_active(
+                candidate_id=candidate.id, 
+                application_id=application.id
+            )
+            
             interaction = db.query(BotInteraction).filter(
                 BotInteraction.application_id == application.id
             ).order_by(BotInteraction.id.asc()).first()
@@ -438,6 +457,11 @@ async def handle_text_answer(message: Message, state: FSMContext):
         data = await _get_current_interaction_data(state)
         question_id = data['questions'][data['current_question']]
         
+        await _update_last_active(
+                candidate_id=data['candidate_id'], 
+                application_id=data['application_id']
+        )
+        
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
             if not question:
@@ -497,6 +521,11 @@ async def handle_choice_answer(callback: CallbackQuery, state: FSMContext):
         choice_idx = int(callback.data.split("_")[1])
         data = await _get_current_interaction_data(state)
         question_id = data['questions'][data['current_question']]
+        
+        await _update_last_active(
+                candidate_id=data['candidate_id'], 
+                application_id=data['application_id']
+        )
         
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
@@ -585,6 +614,11 @@ async def handle_edit_answer(message: Message, state: FSMContext):
     try:
         data = await _get_current_interaction_data(state)
         question_id = data['questions'][data['current_question']]
+        
+        await _update_last_active(
+                candidate_id=data['candidate_id'], 
+                application_id=data['application_id']
+        )
         
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
