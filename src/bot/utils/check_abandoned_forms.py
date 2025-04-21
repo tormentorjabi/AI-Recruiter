@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import src.bot.utils.message_templates as msg_templates
 
 from aiogram import Bot
 from datetime import datetime, timedelta
