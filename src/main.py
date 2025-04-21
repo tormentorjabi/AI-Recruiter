@@ -1,9 +1,9 @@
-import os
 import asyncio
 import logging
 
 from aiogram.types import BotCommand
 from dotenv import load_dotenv
+
 from src.bot.core.bot import bot, dp
 from src.gigachat_module.custom_llm_task import custom_llm_task_loop
 
@@ -25,14 +25,22 @@ async def main() -> None:
             BotCommand(command='/list_hr', description='Список зарегистрированых HR-специалистов (для Админа)')
         ]
         
+        '''
+            Сборка основных корутин приложения:
+                - set_bot_commands: меню всплывающих команд Telegram бота.
+                - bot_task: основной цикл работы Telegram бота, запуск получения событий.
+                - direct_prompts_to_gigachat: прямое общение с моделью GigaChat [DEV MODE ONLY]
+        ''' 
         set_bot_commands = asyncio.create_task(bot.set_my_commands(commands=commands))
         bot_task = asyncio.create_task(dp.start_polling(bot))
-        llm_task = asyncio.create_task(custom_llm_task_loop())
+        # [DEV MODE ONLY]
+        # direct_prompts_to_gigachat = asyncio.create_task(custom_llm_task_loop()) 
 
         await asyncio.gather(
             set_bot_commands,
             bot_task,
-            llm_task
+            # [DEV MODE ONLY]
+            # direct_prompts_to_gigachat
         )
     except Exception as e:
         logger.error(f'Error occured: {e}', exc_info=True)
