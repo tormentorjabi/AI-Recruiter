@@ -26,6 +26,8 @@ class Application(Base):
         vacancy_id (id): FK на вакансию
         status (enum): Статус заявки ('active', 'accepted', 'rejected')
         application_date (datetime): Дата получения отклика
+        auth_token (str): Токен, для идентификации кандидата по отклику в Telegram боте
+        token_expiry (datetime): Дата истечения жизни токена
     """
     __tablename__ = 'applications'
     
@@ -34,6 +36,8 @@ class Application(Base):
     vacancy_id = Column(Integer, ForeignKey('vacancies.id'))
     status = Column(Enum(ApplicationStatus), default=ApplicationStatus.ACTIVE)
     application_date = Column(DateTime)
+    auth_token = Column(String, nullable=True, unique=True, index=True)
+    token_expiry = Column(DateTime, nullable=True)
     
     candidate = relationship("Candidate", back_populates="applications")
     vacancy = relationship("Vacancy", back_populates="applications")
