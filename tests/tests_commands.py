@@ -88,7 +88,7 @@ async def populate_database_and_generate_candidate_token_test(message: Message):
             db.add(candidate)
             db.flush()
 
-            # Создаем и записываем в БД
+            # Создаем и записываем в БД вопросы для созданной вакансии
             for q_data in QUESTION_DATA:
                 question = BotQuestion(
                     vacancy_id = vacancy.id,

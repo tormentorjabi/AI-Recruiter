@@ -26,7 +26,7 @@ def set_application_token(
     application_id: int,
     nbytes: int = 32,
     expiry_days: int = 31
-):
+) -> str:
     '''
     Сгенерировать и установить токен идентификации для записи конкретного отклика
     
@@ -34,6 +34,9 @@ def set_application_token(
         application_id (int): ID отклика в БД
         nbytes (int): Количество рандомных байтов (default=32),
         expiry_days (int): Срок жизни токена идентификации в днях (default=31)
+    
+    Returns:
+        token (str): Рандомная, URL-безопасная строка, в кодировке Base64
     '''
     try:
         with Session() as db:
