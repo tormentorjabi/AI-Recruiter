@@ -19,6 +19,10 @@ load_dotenv()
 async def main() -> None:
     try:
         commands = [
+            # [DEV MODE ONLY] commands
+            BotCommand(command='/clear_database', description='Очистить БД (DEV MODE ONLY)'),
+            BotCommand(command='/no_tg_candidate_test', description='Заполнить БД и сделать токен для кандидата (DEV MODE ONLY)'),
+            # Production commands
             BotCommand(command='/start', description='Запуск бота'),
             BotCommand(command='/cancel', description='Отменить процесс заполнение анкеты (для соискателя по вакансии)'),
             BotCommand(command='/register_hr', description='Регистрация (для HR-специалиста)'),

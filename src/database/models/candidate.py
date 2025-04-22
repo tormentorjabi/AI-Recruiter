@@ -29,11 +29,11 @@ class Candidate(Base):
     __tablename__ = 'candidates'
     
     id = Column(Integer, primary_key=True)
-    full_name = Column(String(255))
-    birth_date = Column(Date)
-    city = Column(String(100))
-    citizenship = Column(String(100))
-    relocation_ready = Column(Boolean)
+    full_name = Column(String(255), nullable=True)
+    birth_date = Column(Date, nullable=True)
+    city = Column(String(100), nullable=True)
+    citizenship = Column(String(100), nullable=True)
+    relocation_ready = Column(Boolean, nullable=True)
     telegram_id = Column(String(50))
     status = Column(String(50), server_default='pending')
     created_at = Column(DateTime, default=datetime.utcnow)
