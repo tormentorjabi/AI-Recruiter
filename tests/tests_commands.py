@@ -46,7 +46,7 @@ async def truncate_database(message: Message):
         logger.error(f'Error in clear_database: {str(e)}')
 
 
-@tests_router.message(Command('populate_database_and_generate_candidate_token'))
+@tests_router.message(Command('no_tg_candidate_test'))
 async def populate_database_and_generate_candidate_token_test(message: Message):
     try:
         await message.answer(
