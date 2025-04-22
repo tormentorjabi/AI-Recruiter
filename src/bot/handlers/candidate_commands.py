@@ -2,7 +2,7 @@ import logging
 import src.bot.utils.message_templates as msg_templates
 
 from aiogram import Router, F
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 candidate_router = Router()
 
 class CandidateStates(StatesGroup):
+    token_auth = State()
     answering = State()
     review = State()
     editing = State()
@@ -232,6 +233,54 @@ async def handle_review(message: Message, state: FSMContext, page: int = 0):
 # --------------------------
 #  Common Handlers
 # --------------------------
+@candidate_router.message(
+    StateFilter(CandidateStates.token_auth),
+    # Внимание!
+    # Проверка работает с token_urlsafe(32) токенами.
+    # При изменении длины токена или метода генерации, 
+    # нужно изменить фильтрацию.
+    F.text.regexp(r'^[a-zA-Z0-9_-]{43}$')
+)
+async def handle_token_auth(message: Message, state: FSMContext):
+    '''Обработка идентификации кандидата по его токену'''
+    try:
+        token = message.text.strip()
+        current_time = datetime.utcnow()
+        telegram_id = str(message.from_user.id)
+        
+        with Session() as db:
+            # Ищем отклик по отправленному токену
+            application = db.query(Application).filter(
+                Application.auth_token == token,
+                Application.token_expiry > current_time
+            ).first()
+            
+            if not application:
+                await message.answer(msg_templates.TOKEN_AUTH_INVALID)
+                return
+            
+            # Получаем кандидата по отклику 
+            candidate = db.query(Candidate).get(application.candidate_id)
+            if not candidate:
+                await message.answer(msg_templates.CANDIDATE_NOT_FOUND)
+                return
+            
+            # Дополняем информацию о Telegram ID
+            candidate.telegram_id = telegram_id
+            
+            db.commit()
+            
+            # Уведомляем кандидата об успешной идентификации его в система
+            await message.answer(msg_templates.TOKEN_AUTH_SUCCESS)
+            await state.clear()
+            # Переходим к сценарию прохождения анкеты
+            await candidate_start(message, state)
+        
+    except Exception as e:
+        logger.error(f'Error in handle_token_auth: {str(e)}')
+        await _handle_db_error(message, "Ошибка при проверке токена кандидата")
+
+
 @candidate_router.message(Command('cancel'))
 @candidate_router.callback_query(F.data == 'cancel_process')
 async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMContext):
@@ -289,6 +338,8 @@ async def candidate_start(message: Message, state: FSMContext):
             if not candidate:
                 await message.answer(msg_templates.CANDIDATE_NOT_FOUND)
                 await message.answer(msg_templates.NOT_REGISTERED_AS_HR)
+                await message.answer(msg_templates.TOKEN_AUTH_REQUEST)
+                await state.set_state(CandidateStates.token_auth)
                 return
 
             application = db.query(Application).filter(
