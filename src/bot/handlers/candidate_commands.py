@@ -336,7 +336,6 @@ async def candidate_start(message: Message, state: FSMContext):
             ).first()
             
             if not candidate:
-                await message.answer(msg_templates.CANDIDATE_NOT_FOUND)
                 await message.answer(msg_templates.NOT_REGISTERED_AS_HR)
                 await message.answer(msg_templates.TOKEN_AUTH_REQUEST)
                 await state.set_state(CandidateStates.token_auth)
