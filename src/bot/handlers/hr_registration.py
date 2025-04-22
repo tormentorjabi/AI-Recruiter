@@ -13,14 +13,14 @@ from src.database.models import RegistrationToken, HrSpecialist
 from src.bot.config import ADMIN_CHANNEL_ID
 
 
-registration_router = Router()
+hr_registration_router = Router()
 
 class HrRegistrationStates(StatesGroup):
     waiting_for_token = State()
     waiting_for_full_name = State()
     
     
-@registration_router.message(Command('register_hr'))
+@hr_registration_router.message(Command('register_hr'))
 async def start_hr_registration(message: Message, state: FSMContext):
     with Session() as db:
         existing_hr = db.query(HrSpecialist).filter_by(
@@ -38,7 +38,7 @@ async def start_hr_registration(message: Message, state: FSMContext):
     await state.set_state(HrRegistrationStates.waiting_for_token)
     
     
-@registration_router.message(
+@hr_registration_router.message(
     StateFilter(HrRegistrationStates.waiting_for_token),
     F.text.regexp(r'^[a-zA-Z0-9_-]{43}$')
 )
@@ -78,7 +78,7 @@ async def process_token(message: Message, state: FSMContext):
         await state.set_state(HrRegistrationStates.waiting_for_full_name)
        
         
-@registration_router.message(StateFilter(HrRegistrationStates.waiting_for_full_name))
+@hr_registration_router.message(StateFilter(HrRegistrationStates.waiting_for_full_name))
 async def process_full_name(message: Message, state: FSMContext):
     full_name = message.text.strip()
     user_data = await state.get_data()
