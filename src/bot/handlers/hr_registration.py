@@ -105,7 +105,8 @@ async def process_full_name(message: Message, state: FSMContext):
             new_hr = HrSpecialist(
                 telegram_id=str(message.from_user.id),
                 full_name=full_name,
-                is_approved=True
+                is_approved=True,
+                work_mode=True
             )
             
             db.add(new_hr)
