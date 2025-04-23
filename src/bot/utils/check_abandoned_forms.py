@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from aiogram import Bot
-from datetime import datetime, timedelta
+from datetime import timedelta, timezone, datetime
 
 from src.bot.utils.schedule_form_reminder import schedule_form_reminder
 
@@ -24,7 +24,7 @@ async def check_abandoned_forms(bot: Bot, delay_minutes: int = 30):
         try:
             with Session() as db:
                 # Ищем BotInteraction, которые все ещё активны, но не были обновлены долгое время
-                threshold_time = datetime.utcnow() - INACTIVITY_THRESHOLD
+                threshold_time = datetime.now(timezone.utc) - INACTIVITY_THRESHOLD
                 abandoned_interactions = db.query(BotInteraction).filter(
                     BotInteraction.state == InteractionState.STARTED,
                     BotInteraction.last_active < threshold_time
@@ -46,7 +46,7 @@ async def check_abandoned_forms(bot: Bot, delay_minutes: int = 30):
                             bot=bot,
                             user_id=user_id,
                             application_id=interaction.application_id,
-                            delay_seconds=(60 * delay_minutes)   
+                            delay_seconds=(1)   
                         )
         except Exception as e:
             logger.error(f'Error checking for abandoned forms: {str(e)}')
