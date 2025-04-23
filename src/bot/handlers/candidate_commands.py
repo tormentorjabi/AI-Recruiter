@@ -17,6 +17,7 @@ from src.database.models import (
 
 from src.bot.utils.bot_answers_json_builder import build_json
 from src.bot.utils.schedule_form_reminder import schedule_form_reminder
+from src.bot.utils.handle_error import handle_db_error
 
 from src.database.models.application import ApplicationStatus
 from src.database.models.bot_interaction import InteractionState
@@ -38,10 +39,10 @@ class CandidateStates(StatesGroup):
 # --------------------------
 #  Core Utilities
 # --------------------------
-async def _handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
-    '''Лог ошибок, возникающих в результате ошибок БД'''
-    await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
-    logger.error(error_msg)
+# async def handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
+#     '''Лог ошибок, возникающих в результате ошибок БД'''
+#     await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
+#     logger.error(error_msg)
 
 
 async def _update_last_active(candidate_id: int, application_id: int):
@@ -220,7 +221,7 @@ async def handle_review(message: Message, state: FSMContext, page: int = 0):
             db.commit()
         
         logger.error(f"Review error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 # --------------------------
@@ -271,7 +272,7 @@ async def handle_token_auth(message: Message, state: FSMContext):
         
     except Exception as e:
         logger.error(f'Error in handle_token_auth: {str(e)}')
-        await _handle_db_error(message, "Ошибка при проверке токена кандидата")
+        await handle_db_error(message, "Ошибка при проверке токена кандидата")
 
 
 @candidate_router.message(Command('cancel'))
@@ -314,7 +315,7 @@ async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMCo
         
     except Exception as e:
         logger.error(f"Cancel error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 @candidate_router.message(Command("start"))
@@ -435,7 +436,7 @@ async def candidate_start(message: Message, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Start error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 # --------------------------
@@ -462,7 +463,7 @@ async def handle_next_question(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
     except Exception as e:
         logger.error(f"Next question error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 async def handle_next_question_auto(message: Message, state: FSMContext):
@@ -475,7 +476,7 @@ async def handle_next_question_auto(message: Message, state: FSMContext):
             await _show_question(next_question, message, state)
     except Exception as e:
         logger.error(f"Auto next error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 @candidate_router.callback_query(F.data.startswith("review_page_"))
@@ -487,7 +488,7 @@ async def handle_review_pagination(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
     except Exception as e:
         logger.error(f"Pagination error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 # --------------------------
@@ -534,7 +535,7 @@ async def handle_text_answer(message: Message, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Answer error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 async def _process_answer_content(message: Message, question: BotQuestion):
@@ -588,7 +589,7 @@ async def handle_choice_answer(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
     except Exception as e:
         logger.error(f"Choice error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 # --------------------------
@@ -648,7 +649,7 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
     except Exception as e:
         logger.error(f"Edit error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 @candidate_router.message(CandidateStates.editing)
@@ -679,7 +680,7 @@ async def handle_edit_answer(message: Message, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Edit answer error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 @candidate_router.callback_query(F.data.startswith("edit_choice_"))
@@ -702,7 +703,7 @@ async def handle_edit_choice(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
     except Exception as e:
         logger.error(f"Edit choice error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 @candidate_router.callback_query(F.data == "cancel_edit", CandidateStates.editing)
@@ -758,7 +759,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Submit error: {str(e)}")
-        await _handle_db_error(callback.message, "Ошибка отправки анкеты")
+        await handle_db_error(callback.message, "Ошибка отправки анкеты")
 
 
 # --------------------------
