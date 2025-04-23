@@ -44,6 +44,8 @@ class Application(Base):
     resume = relationship("Resume", back_populates="application")
     analysis_results = relationship("AnalysisResult", back_populates="application")
     interaction = relationship("BotInteraction", back_populates="application")
+    notification = relationship("HrNotification", back_populates="application")
+    
     # Removal's reason: described in CandidateAnswer.py file
     # answers = relationship("CandidateAnswer", back_populates="application")
     

@@ -28,7 +28,7 @@ class BotInteraction(Base):
         current_question_id (int): FK на текущий вопрос из банка вопросов
         application_id (int): FK на отклик
         vacancy_id (int): FK на вакансию
-        answers (JSON): Промежуточные ответы {question_id: answer_text}\
+        answers (JSON): Промежуточные ответы {question_id: answer_text}
         state (enum): Статус интерактива
         started_at (datetime): Время начала интерактива
         last_active (datetime): Последнее время интерактива
