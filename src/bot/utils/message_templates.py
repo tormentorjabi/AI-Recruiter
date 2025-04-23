@@ -201,9 +201,9 @@ def detail_text_message(
     return (
             f"👤 Кандидат: {candidate_name}\n\n"
             f"📌 Вакансия: {vacancy_title}\n\n"
-            f"⭐ Оценка GigaChat: {score}\n\n"
+            f"⭐ Оценка GigaChat: **{score}**\n\n"
             f"📅 Оценка получена: {date}\n\n"
-            f"🔄 Статус по решению от HR: {status}"
+            f"🔄 Статус по решению от HR: **{status}**"
     )
 
 def candidate_answers_message(
