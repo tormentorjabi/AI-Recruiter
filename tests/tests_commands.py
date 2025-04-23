@@ -1,14 +1,17 @@
 import logging
+import random
 
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 from datetime import datetime
 from sqlalchemy import text
+from datetime import datetime
 
 from src.database.session import Session
 from src.database.models import (
-    Candidate, Application, Vacancy, BotQuestion
+    Candidate, Application, Vacancy, BotQuestion,
+    HrNotification, HrSpecialist
 )
 
 from src.database.models.application import ApplicationStatus
@@ -19,6 +22,13 @@ from src.database.utils.generate_application_token import set_application_token
 
 logger = logging.getLogger(__name__)
 tests_router = Router()
+
+
+def generate_random_score():
+    while True:
+        random_number = random.random() * 100
+        if 0 <= random_number <= 100:
+            return round(random_number / 100, 2)
 
 
 @tests_router.message(Command('clear_database'))
@@ -35,7 +45,12 @@ async def truncate_database(message: Message):
                 "❗️ВЫПОЛНЯЕМ ОЧИСТКУ БД...❗️\n"
             )
             
-            db.execute(text('TRUNCATE applications, candidates, vacancies, bot_questions, bot_interactions CASCADE'))
+            query = (
+            "TRUNCATE applications, candidates, vacancies, "
+            "bot_questions, bot_interactions, hr_notifications, hr_specialists CASCADE"
+            )
+            
+            db.execute(text(query))
             db.commit()
             
             await message.answer(
@@ -49,24 +64,10 @@ async def truncate_database(message: Message):
 @tests_router.message(Command('no_tg_candidate_test'))
 async def populate_database_and_generate_candidate_token_test(message: Message):
     try:
-        await message.answer(
-            "❗️ВНИМАНИЕ❗️\n"
-            "ВЫ ВЫПОЛНЯЕТЕ КОМАНДУ ТИПА `[DEVELOPMENT]`\n\n"
-            "У ВАС НЕ ДОЛЖНО БЫТЬ ДОСТУПА К НЕЙ В СОСТОЯНИИ `[PRODUCTION]`",
-            parse_mode='Markdown'
-        )
-
+        await truncate_database(message)
         with Session() as db:
             await message.answer(
-                "❗️ВЫПОЛНЯЕМ ОЧИСТКУ БД...❗️\n"
-            )
-            
-            db.execute(text('TRUNCATE applications, candidates, vacancies, bot_questions CASCADE'))
-            db.commit()
-            
-            await message.answer(
-                "❗️ОЧИСТКА БД УСПЕШНА❗️\n"
-                "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ..."
+                "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ БД..."
             )
             
             # Создаем и записываем в БД тестовую вакансию
@@ -133,6 +134,79 @@ async def populate_database_and_generate_candidate_token_test(message: Message):
             
     except Exception as e:
         logger.error(f'Error in populate_database_test: {str(e)}')
+        
+
+@tests_router.message(Command('create_notifications_test'))
+async def create_notifications(message: Message):
+    try:
+        args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
+        count = int(args[0].strip())
+        await truncate_database(message)
+        with Session() as db:
+            await message.answer(
+                "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ БД..."
+            )
+         
+            # Создаем и записываем в БД тестовую вакансию
+            vacancy = Vacancy(
+                title = 'Тестовая вакансия',
+                description = 'Описание для вакансии',
+                created_at = datetime.utcnow()
+            )
+            
+            # Создаем и записываем в БД тестового кандидата
+            candidate = Candidate(
+                full_name = "ФАМИЛИЯ ИМЯ ОТЧЕСТВО",
+                birth_date = '1991-01-01',
+                city = None,
+                citizenship = None,
+                relocation_ready = True,
+                telegram_id=str(message.from_user.id)
+            )
+            
+            hr = HrSpecialist(
+                telegram_id=str(message.from_user.id),
+                full_name="Maxim",
+                is_approved=True,
+                work_mode=True,
+                created_at=datetime.utcnow()
+            )
+            
+            # Создаем и записываем в БД его отклик
+            application = Application(
+                candidate_id = candidate.id,
+                vacancy_id = vacancy.id,
+                status = ApplicationStatus.ACTIVE,
+                application_date = datetime.utcnow()
+            )
+            
+            db.add(hr)
+            db.add(vacancy)
+            db.add(candidate)
+            db.add(application)
+            db.flush()
+
+            for i in range(0, count):
+                score = generate_random_score()
+                notification = HrNotification(
+                    candidate_id=candidate.id,
+                    hr_specialist_id=hr.id,
+                    vacancy_id=vacancy.id,
+                    application_id=application.id,
+                    channel='telegram',
+                    analysis_score=score,
+                    final_decision='approve' if score > 0.8 else 'decline',
+                    sent_at=datetime.utcnow(),
+                    status='new'
+                )
+                db.add(notification)
+            
+            db.commit()    
+        await message.answer(
+        "🔥 БД ЗАПОЛНЕНА ТЕСТОВЫМИ ДАННЫМИ"
+    )
+    except Exception as e:
+        logger.error(f'Error in create_notifications: {str(e)}')
         
         
 async def send_application_token(application_id, candidate_email=None, candidate_phone=None):

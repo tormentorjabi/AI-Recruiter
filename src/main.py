@@ -31,6 +31,7 @@ async def main() -> None:
              # [DEV MODE ONLY] commands
             BotCommand(command='/clear_database', description='Очистить БД (DEV MODE ONLY)'),
             BotCommand(command='/no_tg_candidate_test', description='Заполнить БД и сделать токен для кандидата (DEV MODE ONLY)'),
+            BotCommand(command='/create_notifications_test', description='Заполнить БД и сделать уведомления для HR (DEV MODE ONLY)'),
         ]
         
         '''

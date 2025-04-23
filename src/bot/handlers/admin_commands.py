@@ -46,7 +46,8 @@ async def generate_token(message: Message):
             admin = HrSpecialist(
                 telegram_id=str(ADMIN_USER_ID),
                 full_name="System Admin",
-                is_approved=True
+                is_approved=True,
+                work_mode=True
             )
             db.add(admin)
             db.commit()
