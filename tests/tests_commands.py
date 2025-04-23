@@ -141,7 +141,6 @@ async def create_notifications(message: Message):
     try:
         args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
         count = int(args[0].strip())
-        await truncate_database(message)
         with Session() as db:
             await message.answer(
                 "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ БД..."
