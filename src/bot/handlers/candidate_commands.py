@@ -65,6 +65,7 @@ async def _get_current_interaction_data(state: FSMContext):
         'candidate_id': data.get('candidate_id'),
         'application_id': data.get('application_id'),
         'vacancy_id': data.get('vacancy_id', ''),
+        'vacancy_title': data.get('vacancy_title', ''),
         'current_question': data.get('current_question', 0),
         'questions': data.get('questions', []),
         'answers': data.get('answers', {})
@@ -737,15 +738,18 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
  
         await callback.message.answer(msg_templates.ON_FORM_SUBMIT)
         
+        vacancy_id=data.get('vacancy_id', -1)
+        application_id=data.get('application_id', -1),
         # Собираем ответы кандидата
         formatted_answers = build_json(
-            application_id=data.get('application_id', -1),
-            vacancy_id=data.get('vacancy_id', -1)
+            application_id=application_id,
+            vacancy_id=vacancy_id
         )
         # Отправляем запросы в GigaChat
         await handle_proceed_to_llm(
             candidate_id=data.get('candidate_id', -1),
-            application_id=data.get('application_id', -1),
+            application_id=application_id,
+            vacancy_id=vacancy_id,
             answers=formatted_answers
         )
         
@@ -763,6 +767,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
 async def handle_proceed_to_llm(
     candidate_id: int,
     application_id: int,
+    vacancy_id: int,
     answers: str
 ):
     '''Отправить ответы кандидата в GigaChat и уведомить о результатах HR-специалистов'''
@@ -770,6 +775,11 @@ async def handle_proceed_to_llm(
     tg_screening = TelegramScreening()
     # Отправляем ответы кандидата на оценку в GigaChat
     analysis = await tg_screening.conduct_additional_screening(answers)
+    try:
+        analysis_score = float(analysis)
+    except ValueError:
+        analysis_score = 0
+        
     try:
         with Session() as db:
             # Сохраняем результаты обработки нейросетью
@@ -780,21 +790,25 @@ async def handle_proceed_to_llm(
                 source="telegram",
                 # TODO:
                 # - Решение должно зависеть от оценки GigaChat
-                final_decision="approve",
+                final_decision="approve" if analysis_score > 0.8 else "rejected",
                 processed_at=datetime.utcnow()
             )
             db.add(analysis_result)
+            db.flush()
+            
+            decision = analysis_result.final_decision
             # Создаем уведомления для HR
             for hr in db.query(HrSpecialist).all():
                 notification = HrNotification(
                     candidate_id=candidate_id,
                     hr_specialist_id=hr.id,
+                    application_id=application_id,
+                    vacancy_id=vacancy_id,
                     channel='telegram',
-                    sent_data={
-                        "Кандидат": candidate_id,
-                        "Оценка:": analysis
-                    },
-                    status="new"
+                    analysis_score=analysis_score,
+                    final_decision=decision,           
+                    status="new",
+                    sent_at=datetime.utcnow()
                 )
                 db.add(notification)
             
