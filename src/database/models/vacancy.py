@@ -26,6 +26,7 @@ class Vacancy(Base):
     description = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    notifications = relationship("HrNotification", back_populates="vacancy")
     applications = relationship("Application", back_populates="vacancy")
     questions = relationship("BotQuestion", back_populates="vacancy")
     

@@ -60,7 +60,7 @@ async def process_token(message: Message, state: FSMContext):
         token = db.query(RegistrationToken).filter_by(
             token=token_value
         ).first()
-        print(token)
+
         if not token:
             await message.answer(msg_templates.BAD_REGISTRATION_TOKEN)
             return await state.clear()
@@ -105,7 +105,8 @@ async def process_full_name(message: Message, state: FSMContext):
             new_hr = HrSpecialist(
                 telegram_id=str(message.from_user.id),
                 full_name=full_name,
-                is_approved=True
+                is_approved=True,
+                work_mode=True
             )
             
             db.add(new_hr)

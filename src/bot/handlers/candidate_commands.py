@@ -17,6 +17,7 @@ from src.database.models import (
 
 from src.bot.utils.bot_answers_json_builder import build_json
 from src.bot.utils.schedule_form_reminder import schedule_form_reminder
+from src.bot.utils.handle_error import handle_db_error
 
 from src.database.models.application import ApplicationStatus
 from src.database.models.bot_interaction import InteractionState
@@ -38,10 +39,10 @@ class CandidateStates(StatesGroup):
 # --------------------------
 #  Core Utilities
 # --------------------------
-async def _handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
-    '''Лог ошибок, возникающих в результате ошибок БД'''
-    await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
-    logger.error(error_msg)
+# async def handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
+#     '''Лог ошибок, возникающих в результате ошибок БД'''
+#     await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
+#     logger.error(error_msg)
 
 
 async def _update_last_active(candidate_id: int, application_id: int):
@@ -65,6 +66,7 @@ async def _get_current_interaction_data(state: FSMContext):
         'candidate_id': data.get('candidate_id'),
         'application_id': data.get('application_id'),
         'vacancy_id': data.get('vacancy_id', ''),
+        'vacancy_title': data.get('vacancy_title', ''),
         'current_question': data.get('current_question', 0),
         'questions': data.get('questions', []),
         'answers': data.get('answers', {})
@@ -219,7 +221,7 @@ async def handle_review(message: Message, state: FSMContext, page: int = 0):
             db.commit()
         
         logger.error(f"Review error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 # --------------------------
@@ -270,7 +272,7 @@ async def handle_token_auth(message: Message, state: FSMContext):
         
     except Exception as e:
         logger.error(f'Error in handle_token_auth: {str(e)}')
-        await _handle_db_error(message, "Ошибка при проверке токена кандидата")
+        await handle_db_error(message, "Ошибка при проверке токена кандидата")
 
 
 @candidate_router.message(Command('cancel'))
@@ -313,7 +315,7 @@ async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMCo
         
     except Exception as e:
         logger.error(f"Cancel error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 @candidate_router.message(Command("start"))
@@ -434,7 +436,7 @@ async def candidate_start(message: Message, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Start error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 # --------------------------
@@ -461,7 +463,7 @@ async def handle_next_question(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
     except Exception as e:
         logger.error(f"Next question error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 async def handle_next_question_auto(message: Message, state: FSMContext):
@@ -474,7 +476,7 @@ async def handle_next_question_auto(message: Message, state: FSMContext):
             await _show_question(next_question, message, state)
     except Exception as e:
         logger.error(f"Auto next error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 @candidate_router.callback_query(F.data.startswith("review_page_"))
@@ -486,7 +488,7 @@ async def handle_review_pagination(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
     except Exception as e:
         logger.error(f"Pagination error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 # --------------------------
@@ -533,7 +535,7 @@ async def handle_text_answer(message: Message, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Answer error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 async def _process_answer_content(message: Message, question: BotQuestion):
@@ -587,7 +589,7 @@ async def handle_choice_answer(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
     except Exception as e:
         logger.error(f"Choice error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 # --------------------------
@@ -647,7 +649,7 @@ async def handle_edit_review(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
     except Exception as e:
         logger.error(f"Edit error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 @candidate_router.message(CandidateStates.editing)
@@ -678,7 +680,7 @@ async def handle_edit_answer(message: Message, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Edit answer error: {str(e)}")
-        await _handle_db_error(message)
+        await handle_db_error(message)
 
 
 @candidate_router.callback_query(F.data.startswith("edit_choice_"))
@@ -701,7 +703,7 @@ async def handle_edit_choice(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
     except Exception as e:
         logger.error(f"Edit choice error: {str(e)}")
-        await _handle_db_error(callback.message)
+        await handle_db_error(callback.message)
 
 
 @candidate_router.callback_query(F.data == "cancel_edit", CandidateStates.editing)
@@ -737,15 +739,18 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
  
         await callback.message.answer(msg_templates.ON_FORM_SUBMIT)
         
+        vacancy_id=data.get('vacancy_id', -1)
+        application_id=data.get('application_id', -1),
         # Собираем ответы кандидата
         formatted_answers = build_json(
-            application_id=data.get('application_id', -1),
-            vacancy_id=data.get('vacancy_id', -1)
+            application_id=application_id,
+            vacancy_id=vacancy_id
         )
         # Отправляем запросы в GigaChat
         await handle_proceed_to_llm(
             candidate_id=data.get('candidate_id', -1),
-            application_id=data.get('application_id', -1),
+            application_id=application_id,
+            vacancy_id=vacancy_id,
             answers=formatted_answers
         )
         
@@ -754,7 +759,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Submit error: {str(e)}")
-        await _handle_db_error(callback.message, "Ошибка отправки анкеты")
+        await handle_db_error(callback.message, "Ошибка отправки анкеты")
 
 
 # --------------------------
@@ -763,6 +768,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
 async def handle_proceed_to_llm(
     candidate_id: int,
     application_id: int,
+    vacancy_id: int,
     answers: str
 ):
     '''Отправить ответы кандидата в GigaChat и уведомить о результатах HR-специалистов'''
@@ -770,6 +776,11 @@ async def handle_proceed_to_llm(
     tg_screening = TelegramScreening()
     # Отправляем ответы кандидата на оценку в GigaChat
     analysis = await tg_screening.conduct_additional_screening(answers)
+    try:
+        analysis_score = float(analysis)
+    except ValueError:
+        analysis_score = 0
+        
     try:
         with Session() as db:
             # Сохраняем результаты обработки нейросетью
@@ -780,21 +791,25 @@ async def handle_proceed_to_llm(
                 source="telegram",
                 # TODO:
                 # - Решение должно зависеть от оценки GigaChat
-                final_decision="approve",
+                final_decision="approve" if analysis_score > 0.8 else "rejected",
                 processed_at=datetime.utcnow()
             )
             db.add(analysis_result)
+            db.flush()
+            
+            decision = analysis_result.final_decision
             # Создаем уведомления для HR
             for hr in db.query(HrSpecialist).all():
                 notification = HrNotification(
                     candidate_id=candidate_id,
                     hr_specialist_id=hr.id,
+                    application_id=application_id,
+                    vacancy_id=vacancy_id,
                     channel='telegram',
-                    sent_data={
-                        "Кандидат": candidate_id,
-                        "Оценка:": analysis
-                    },
-                    status="new"
+                    analysis_score=analysis_score,
+                    final_decision=decision,           
+                    status="new",
+                    sent_at=datetime.utcnow()
                 )
                 db.add(notification)
             
