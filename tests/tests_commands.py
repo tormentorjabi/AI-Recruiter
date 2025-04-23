@@ -194,7 +194,7 @@ async def create_notifications(message: Message):
                     application_id=application.id,
                     channel='telegram',
                     analysis_score=score,
-                    final_decision='approve' if score > 0.8 else 'decline',
+                    final_decision='approve' if score > 0.8 else 'reject',
                     sent_at=datetime.utcnow(),
                     status='new'
                 )

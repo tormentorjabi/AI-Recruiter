@@ -82,8 +82,12 @@ def get_status_display(status: str) -> str:
     status_map = {
         "new": "🆕 Доступен для обработки",
         "processing": "⏳ В обработке",
+        # Статусы обработки HR'ом
         "approved": "✅ Одобрен",
-        "declined": "❌ Отклонен"
+        "declined": "❌ Отклонен",
+        # Решения GigaChat'а
+        "approve": "✅ Соответствует критериям",
+        "reject": "❌ Ниже критериев"
     }
     return status_map.get(status, f"Неизвестный ({status})")
 
@@ -258,8 +262,8 @@ async def show_notification_detail(callback: CallbackQuery):
                 candidate_name=candidate_name,
                 vacancy_title=vacancy_title,
                 score=notification.analysis_score,
+                decision=get_status_display(notification.final_decision)[2:],
                 date=notification.sent_at.strftime('%Y-%m-%d %H:%M'),
-                # Обрезать emoji из статуса
                 status=get_status_display(notification.status)[2:]
             )
             

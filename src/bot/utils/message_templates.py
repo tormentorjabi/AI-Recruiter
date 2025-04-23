@@ -195,6 +195,7 @@ def detail_text_message(
     candidate_name: str,
     vacancy_title: str,
     score: float,
+    decision: str,
     date,
     status
 ) -> str:
@@ -202,6 +203,7 @@ def detail_text_message(
             f"👤 Кандидат: {candidate_name}\n\n"
             f"📌 Вакансия: {vacancy_title}\n\n"
             f"⭐ Оценка GigaChat: **{score}**\n\n"
+            f"⚙️ Решение GigaChat: **{decision}**\n\n"
             f"📅 Оценка получена: {date}\n\n"
             f"🔄 Статус по решению от HR: **{status}**"
     )

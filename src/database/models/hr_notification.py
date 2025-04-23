@@ -30,9 +30,9 @@ class HrNotification(Base):
         application_id (int): FK на отклик
         channel (str): Канал связи с HR-специалистом
         analysis_score (float): Оценка GigaChat
-        final_decision (str): Решение по отклику
+        final_decision (str): Решение по отклику от GigaChat (approve/reject)
         sent_at (datetime): Время отправления сообщения
-        status (str): Статус отработки по кандидату
+        status (str): Статус отработки по кандидату HR'ом
     """
     __tablename__ = 'hr_notifications'
     
