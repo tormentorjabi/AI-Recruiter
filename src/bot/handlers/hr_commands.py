@@ -89,10 +89,15 @@ def get_status_display(status: str) -> str:
 
 
 def _build_notifications_keyboard(notifications, page=0, items_per_page=5):
+    # Сортируем все решения по следующему принципу:
+    # 1. В обработке (отсортированы по уменьшению оценки GigaChat)
+    # 2. Новые (отсортированы по уменьшению оценки GigaChat)
+    # 3. Одобренные (отсортированы по уменьшению оценки GigaChat)
+    # 4. Отказанные (отсортированы по уменьшению оценки GigaChat)
     sorted_notifications = sorted(
         notifications,
-        key= lambda x: (
-            0 if x.status in ["approved", "processing"] else 1,
+        key=lambda x: (
+            {"processing": 0, "new": 1, "approved": 2, "declined": 3}.get(x.status, 4),
             -x.analysis_score if x.analysis_score else 0
         )
     )
