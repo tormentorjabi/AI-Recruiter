@@ -60,7 +60,7 @@ async def process_token(message: Message, state: FSMContext):
         token = db.query(RegistrationToken).filter_by(
             token=token_value
         ).first()
-        print(token)
+
         if not token:
             await message.answer(msg_templates.BAD_REGISTRATION_TOKEN)
             return await state.clear()
