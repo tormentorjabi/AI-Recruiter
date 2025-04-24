@@ -35,7 +35,7 @@ class ToggleWorkModeStates(StatesGroup):
     StateFilter(ToggleWorkModeStates.waiting_for_confirmation),
     F.text.casefold().in_({"да", "yes", "д", "y"})
 )
-async def confirm_change_work_mode(message: Message, state: FSMContext):
+async def _confirm_change_work_mode(message: Message, state: FSMContext):
     try:
         data = await state.get_data()
         
@@ -69,7 +69,7 @@ async def confirm_change_work_mode(message: Message, state: FSMContext):
 @hr_commands_router.message(
     StateFilter(ToggleWorkModeStates.waiting_for_confirmation)
 )
-async def cancel_change_work_mode(message: Message, state: FSMContext):
+async def _cancel_change_work_mode(message: Message, state: FSMContext):
     await message.answer(msg_templates.WORK_MODE_CHANGE_CANCELLED)
     await state.clear()
 
@@ -115,7 +115,7 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=5):
             vacancy = db.query(Vacancy).get(notification.vacancy_id)
             vacancy_title = vacancy.title
             btn_text = (
-                f"{vacancy_title} | "
+                f"{vacancy_title[:15]} | "
                 f"Оценка: {notification.analysis_score:.2f} | "
                 f"{get_status_display(notification.status)}"
             )
@@ -151,7 +151,7 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=5):
 #  Init Commands Handlers
 # --------------------------
 @hr_commands_router.message(Command('change_work_mode'))
-async def toggle_work_mode(
+async def _toggle_work_mode(
     message: Message,
     state: FSMContext
 ):
@@ -179,7 +179,7 @@ async def toggle_work_mode(
 
 
 @hr_commands_router.message(Command("get_reviews"))
-async def get_reviews(message: Message, user=None):
+async def _get_reviews(message: Message, user=None):
     '''Получить список решений, готовых к обработке специалистами'''
     try:
         with Session() as db:
@@ -213,7 +213,7 @@ async def get_reviews(message: Message, user=None):
 #  Display Handlers
 # --------------------------
 @hr_commands_router.callback_query(F.data.startswith("notifications_page_"))
-async def handle_notifications_pagination(callback: CallbackQuery):
+async def _handle_notifications_pagination(callback: CallbackQuery):
     try:
         page = int(callback.data.split("_")[-1])
         with Session() as db:
@@ -237,7 +237,7 @@ async def handle_notifications_pagination(callback: CallbackQuery):
 
 
 @hr_commands_router.callback_query(F.data.startswith("notification_detail_"))
-async def show_notification_detail(callback: CallbackQuery):
+async def _show_notification_detail(callback: CallbackQuery):
     '''Показать меню справочной информации по кандидату'''
     try:
         notification_id = int(callback.data.split("_")[-1])
@@ -312,7 +312,7 @@ async def show_notification_detail(callback: CallbackQuery):
 
 
 @hr_commands_router.callback_query(F.data.startswith("get_answers_"))
-async def get_candidate_answers(callback: CallbackQuery):
+async def _get_candidate_answers(callback: CallbackQuery):
     '''Получить ответы кандидата по его опроснику'''
     try:
         notification_id = int(callback.data.split("_")[-1])
@@ -334,7 +334,7 @@ async def get_candidate_answers(callback: CallbackQuery):
 
 
 @hr_commands_router.callback_query(F.data.startswith("get_resume_"))
-async def get_candidate_resume(callback: CallbackQuery):
+async def _get_candidate_resume(callback: CallbackQuery):
     '''Получить информацию о резюме кандидата'''
     try:
         notification_id = int(callback.data.split("_")[-1])
@@ -363,7 +363,7 @@ async def get_candidate_resume(callback: CallbackQuery):
 #  Review Action Handlers
 # --------------------------
 @hr_commands_router.callback_query(F.data.startswith("start_processing_"))
-async def start_processing(callback: CallbackQuery):
+async def _start_processing(callback: CallbackQuery):
     '''Взять кандидата в обработку'''
     try:
         notification_id = int(callback.data.split("_")[-1])
@@ -374,14 +374,14 @@ async def start_processing(callback: CallbackQuery):
             db.commit()
             
             await callback.answer(msg_templates.MARK_REVIEW_AS_PROCESSING)
-            await show_notification_detail(callback)
+            await _show_notification_detail(callback)
     except Exception as e:
         logger.error(f'Error after start processing review: {str(e)}')
         await handle_db_error(callback.message)
 
 
 @hr_commands_router.callback_query(F.data.startswith("approve_"))
-async def approve_candidate(callback: CallbackQuery):
+async def _approve_candidate(callback: CallbackQuery):
     '''Одорить кандидата, с автоматическим уведомлением в Telegram'''
     try:
         notification_id = int(callback.data.split("_")[-1])
@@ -400,16 +400,16 @@ async def approve_candidate(callback: CallbackQuery):
             db.commit()
             
             # TODO:
-            # Уведомить кандидата
+            # Уведомить кандидата         
             await callback.answer(msg_templates.MARK_REVIEW_AS_ACCEPTED)
-            await show_notification_detail(callback)
+            await _show_notification_detail(callback)
     except Exception as e:
         logger.error(f'Error after approve review: {str(e)}')
         await (callback.message)
 
 
 @hr_commands_router.callback_query(F.data.startswith("decline_"))
-async def decline_candidate(callback: CallbackQuery):
+async def _decline_candidate(callback: CallbackQuery):
     '''Отказать кандидату, с автоматическим уведомлением в Telegram'''
     try:
         notification_id = int(callback.data.split("_")[-1])
@@ -430,15 +430,15 @@ async def decline_candidate(callback: CallbackQuery):
             # TODO:
             # Уведомить кандидата
             await callback.answer(msg_templates.MARK_REVIEW_AS_DECLINED)
-            await show_notification_detail(callback)
+            await _show_notification_detail(callback)
     except Exception as e:
         logger.error(f'Error after decline review: {str(e)}')
         await handle_db_error(callback.message)
 
 
 @hr_commands_router.callback_query(F.data == "back_to_list")
-async def back_to_list(callback: CallbackQuery):
-    await get_reviews(callback.message, user=callback.from_user)
+async def _back_to_list(callback: CallbackQuery):
+    await _get_reviews(callback.message, user=callback.from_user)
     await callback.answer()
     
     
@@ -446,7 +446,7 @@ async def back_to_list(callback: CallbackQuery):
 #  Handle NO-OP
 # --------------------------
 @hr_commands_router.callback_query(F.data == "noop")
-async def handle_noop(callback: CallbackQuery):
+async def _handle_noop(callback: CallbackQuery):
     '''
         Пустая операция
         Используется для CallbackQuery которые не требуют обработки
