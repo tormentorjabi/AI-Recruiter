@@ -265,7 +265,10 @@ async def handle_token_auth(message: Message, state: FSMContext):
             db.commit()
             
             # Уведомляем кандидата об успешной идентификации его в система
-            await message.answer(msg_templates.TOKEN_AUTH_SUCCESS)
+            await message.answer(
+                msg_templates.TOKEN_AUTH_SUCCESS,
+                parse_mode="Markdown"
+            )
             await state.clear()
             # Переходим к сценарию прохождения анкеты
             await candidate_start(message, state)
