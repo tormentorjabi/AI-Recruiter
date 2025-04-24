@@ -120,7 +120,8 @@ async def delete_hr(
     
     if not args:
         await message.answer(
-            msg_templates.SHOW_DELETE_HR_COMMAND_HELPER
+            msg_templates.SHOW_DELETE_HR_COMMAND_HELPER,
+            parse_mode="Markdown"
         )
         return
 
@@ -144,7 +145,8 @@ async def delete_hr(
                 parse_mode="Markdown"
             )
             await message.answer(
-                msg_templates.SHOW_LIST_HR_COMMAND_HELPER
+                msg_templates.SHOW_LIST_HR_COMMAND_HELPER,
+                parse_mode="Markdown"
             )
             return
         
