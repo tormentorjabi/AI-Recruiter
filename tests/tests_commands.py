@@ -31,7 +31,7 @@ def generate_random_score():
             return round(random_number / 100, 2)
 
 
-@tests_router.message(Command('clear_database'))
+@tests_router.message(Command('clr_db'))
 async def truncate_database(message: Message):
     try:
         await message.answer(
@@ -61,7 +61,7 @@ async def truncate_database(message: Message):
         logger.error(f'Error in clear_database: {str(e)}')
 
 
-@tests_router.message(Command('no_tg_candidate_test'))
+@tests_router.message(Command('token_test'))
 async def populate_database_and_generate_candidate_token_test(message: Message):
     try:
         await truncate_database(message)
@@ -136,7 +136,7 @@ async def populate_database_and_generate_candidate_token_test(message: Message):
         logger.error(f'Error in populate_database_test: {str(e)}')
         
 
-@tests_router.message(Command('create_notifications_test'))
+@tests_router.message(Command('notification_test'))
 async def create_notifications(message: Message):
     try:
         args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
@@ -155,7 +155,7 @@ async def create_notifications(message: Message):
             
             # Создаем и записываем в БД тестового кандидата
             candidate = Candidate(
-                full_name = "ФАМИЛИЯ ИМЯ ОТЧЕСТВО",
+                full_name = "ФИО_КАНДИДАТА",
                 birth_date = '1991-01-01',
                 city = None,
                 citizenship = None,

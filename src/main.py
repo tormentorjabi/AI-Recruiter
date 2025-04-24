@@ -25,13 +25,13 @@ async def main() -> None:
             BotCommand(command='/register_hr', description='Регистрация (для HR-специалиста)'),
             BotCommand(command='/get_reviews', description='Посмотреть решения по кандидатам (для HR-специалиста)'),
             # BotCommand(command='/change_work_mode', description='Сменить режим работы (для HR-специалиста)'),
-            BotCommand(command='/delete_hr', description='Удаление HR-специалиста (для Админа)'),
             BotCommand(command='/generate_token', description='Генерация токена регистрации (для Админа)'),
+            BotCommand(command='/delete_hr', description='Удаление HR-специалиста (для Админа)'),
             BotCommand(command='/list_hr', description='Список зарегистрированых HR-специалистов (для Админа)'),
              # [DEV MODE ONLY] commands
-            BotCommand(command='/clear_database', description='Очистить БД (DEV MODE ONLY)'),
-            BotCommand(command='/no_tg_candidate_test', description='Заполнить БД и сделать токен для кандидата (DEV MODE ONLY)'),
-            BotCommand(command='/create_notifications_test', description='Заполнить БД и сделать уведомления для HR (DEV MODE ONLY)'),
+            BotCommand(command='/clr_db', description='Очистить БД (DEV MODE ONLY)'),
+            BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
+            BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
         ]
         
         '''
