@@ -1,6 +1,7 @@
 import logging
 import src.bot.utils.message_templates as msg_templates
 
+from aiogram import Bot
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -23,6 +24,10 @@ from src.bot.utils.handle_error import handle_db_error
 
 logger = logging.getLogger(__name__)
 hr_commands_router = Router()
+
+ACCEPT_DECISION = True
+DECLINE_DECISION = False
+
 
 class ToggleWorkModeStates(StatesGroup):
     waiting_for_confirmation = State()
@@ -393,14 +398,18 @@ async def _approve_candidate(callback: CallbackQuery):
             candidate = db.query(Candidate).get(notification.candidate_id)
             candidate.status = "approved"
             candidate.update_at = datetime.utcnow()
+            candidate_telegram_id = candidate.telegram_id
             
             application = db.query(Application).get(notification.application_id)
             application.status = "ACCEPTED"
             
             db.commit()
             
-            # TODO:
-            # Уведомить кандидата         
+            await _notify_candidate(
+                bot=callback.bot,
+                telegram_id=candidate_telegram_id,
+                decision=ACCEPT_DECISION
+            )         
             await callback.answer(msg_templates.MARK_REVIEW_AS_ACCEPTED)
             await _show_notification_detail(callback)
     except Exception as e:
@@ -421,20 +430,44 @@ async def _decline_candidate(callback: CallbackQuery):
             candidate = db.query(Candidate).get(notification.candidate_id)
             candidate.status = "declined"
             candidate.update_at = datetime.utcnow()
+            candidate_telegram_id = candidate.telegram_id
             
             application = db.query(Application).get(notification.application_id)
             application.status = "REJECTED"
             
             db.commit()
             
-            # TODO:
-            # Уведомить кандидата
+            await _notify_candidate(
+                bot=callback.bot,
+                telegram_id=candidate_telegram_id,
+                decision=DECLINE_DECISION
+            )
             await callback.answer(msg_templates.MARK_REVIEW_AS_DECLINED)
             await _show_notification_detail(callback)
     except Exception as e:
         logger.error(f'Error after decline review: {str(e)}')
         await handle_db_error(callback.message)
 
+
+async def _notify_candidate(
+    bot: Bot,
+    telegram_id: int, 
+    decision: bool
+):
+    try:
+        if decision:
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=msg_templates.TO_ACCEPTED_CANDIDATE
+            )
+        else:
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=msg_templates.TO_DECLINED_CANDIDATE
+            )
+    except Exception as e:
+        logger.error(f'Error while notifying candidate: {str(e)}')
+            
 
 # --------------------------
 #  Other Handlers
