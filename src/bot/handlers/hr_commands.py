@@ -1,5 +1,6 @@
 import logging
 import src.bot.utils.message_templates as msg_templates
+from src.gigachat_module.telegram_screening import TelegramScreening
 
 from aiogram import Bot
 from aiogram import Router, F
@@ -268,7 +269,7 @@ async def _show_notification_detail(callback: CallbackQuery):
                 vacancy_title=vacancy_title,
                 score=notification.analysis_score,
                 decision=get_status_display(notification.final_decision)[2:],
-                date=notification.sent_at.strftime('%Y-%m-%d %H:%M'),
+                date=notification.sent_at.strftime('%Y-%m-%d'),
                 status=get_status_display(notification.status)[2:]
             )
             
@@ -324,9 +325,16 @@ async def _get_candidate_answers(callback: CallbackQuery):
     
         with Session() as db:
             notification = db.query(HrNotification).get(notification_id)
-            formatted_answers = build_json(
+            answers_json = build_json(
                 application_id=notification.application_id,
                 vacancy_id=notification.vacancy_id
+            )
+            
+            # TelegramScreening.format_responses предоставляет удобный
+            # способ представления JSON ответов кандидата для чтения человеком.
+            # Сам скрининг больше ни для чего здесь не нужен.
+            formatted_answers = TelegramScreening.format_responses(
+                answers_json
             )
             
             await callback.message.answer(
@@ -454,6 +462,7 @@ async def _notify_candidate(
     telegram_id: int, 
     decision: bool
 ):
+    '''Уведомить кандидата о результах проверки HR-специалистом'''
     try:
         if decision:
             await bot.send_message(

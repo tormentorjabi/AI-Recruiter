@@ -46,7 +46,8 @@ class TelegramScreening:
             criteria_text += f"- {key.replace('_', ' ').title()}: {value}\n"
         return criteria_text
     
-    def _format_responses(self, responses):
+    @classmethod
+    def format_responses(self, responses):
         """
         Форматировать ответы кандидата в читаемый вид
         Format candidate responses into a readable string
@@ -80,7 +81,7 @@ class TelegramScreening:
             str: Отформатированная строка с ответами кандидата
         """
         json_answers = json.loads(responses)
-        formatted_text = "Ответы кандидата:\n"
+        formatted_text = ""
         for question, answer in json_answers.items():
             formatted_text += f"Q: {question}\nA: {answer}\n\n"
         return formatted_text
@@ -118,7 +119,7 @@ class TelegramScreening:
         Ограничивайся двумя знаками после запятой.
         В ответе присылай просто оценку в формате: 'X.XX', например '0.60'        
         """)
-        responses_text = self._format_responses(candidate_responses)
+        responses_text = self.format_responses(candidate_responses)
         
         messages = [
             system_message,
