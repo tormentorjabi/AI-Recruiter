@@ -169,7 +169,10 @@ async def _toggle_work_mode(
             ).first()
 
             if not hr:
-                await message.answer(msg_templates.NOT_REGISTERED_AS_HR)
+                await message.answer(
+                    msg_templates.NOT_REGISTERED_AS_HR,
+                    parse_mode="Markdown"
+                )
                 return
             
             hr_work_mode = hr.work_mode
@@ -197,7 +200,10 @@ async def _get_reviews(message: Message, user=None):
             ).first()
 
             if not hr:
-                await message.answer(msg_templates.NOT_REGISTERED_AS_HR)
+                await message.answer(
+                    msg_templates.NOT_REGISTERED_AS_HR,
+                    parse_mode="Markdown"
+                )
                 return
 
             notifications = db.query(HrNotification).join(Vacancy).all()
