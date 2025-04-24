@@ -436,15 +436,15 @@ async def _decline_candidate(callback: CallbackQuery):
         await handle_db_error(callback.message)
 
 
+# --------------------------
+#  Other Handlers
+# --------------------------
 @hr_commands_router.callback_query(F.data == "back_to_list")
 async def _back_to_list(callback: CallbackQuery):
     await _get_reviews(callback.message, user=callback.from_user)
     await callback.answer()
-    
-    
-# --------------------------
-#  Handle NO-OP
-# --------------------------
+
+
 @hr_commands_router.callback_query(F.data == "noop")
 async def _handle_noop(callback: CallbackQuery):
     '''
