@@ -4,6 +4,11 @@ from aiogram.filters import CommandStart
 
 from src.bot.config import ADMIN_CHANNEL_ID
 
+'''
+    TODO:
+        - Rework /start command or scrape it entirely
+'''
+
 
 start_router = Router()
 
