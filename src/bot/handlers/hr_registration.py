@@ -126,7 +126,8 @@ async def process_full_name(message: Message, state: FSMContext):
         return
     
     await message.answer(
-        msg_templates.hr_registered_message(hr_full_name=hr_full_name)
+        msg_templates.hr_registered_message(hr_full_name=hr_full_name),
+        parse_mode="Markdown"
     )
             
     await message.bot.send_message(
