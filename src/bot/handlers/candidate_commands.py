@@ -283,6 +283,13 @@ async def cancel_interaction(query_or_msg: Message | CallbackQuery, state: FSMCo
         message = query_or_msg.message if isinstance(query_or_msg, CallbackQuery) else query_or_msg
         data = await state.get_data()
         
+        if not data or 'candidate_id' not in data or 'application_id' not in data:
+            await message.answer(
+                msg_templates.NO_ACTIVE_SESSION_FOUND_TO_CANCEL,
+                parse_mode="Markdown"
+            )
+            return
+        
         if data.get('current_question', 0) >= 0:
             try:
                 with Session() as db:
