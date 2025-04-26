@@ -315,7 +315,7 @@ async def _show_notification_detail(callback: CallbackQuery):
             await callback.message.edit_text(
                 detail_text,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
-                parse_mode="Markdown"
+                parse_mode="MarkdownV2"
             )
         await callback.answer()
     except Exception as e:
