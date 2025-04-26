@@ -98,7 +98,7 @@ def get_status_display(status: str) -> str:
     return status_map.get(status, f"Неизвестный ({status})")
 
 
-def _build_notifications_keyboard(notifications, page=0, items_per_page=5):
+def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
     # Сортируем все решения по следующему принципу:
     # 1. В обработке (отсортированы по уменьшению оценки GigaChat)
     # 2. Новые (отсортированы по уменьшению оценки GigaChat)
