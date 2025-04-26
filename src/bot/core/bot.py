@@ -1,5 +1,8 @@
-from aiogram.fsm.storage.memory import MemoryStorage
+import os
+from aiogram.fsm.storage.mongo import MongoStorage
 from aiogram import Bot, Dispatcher
+
+from dotenv import load_dotenv
 
 from src.bot.config import TELEGRAM_BOT_TOKEN
 
@@ -14,7 +17,11 @@ from src.bot.handlers.candidate_commands import candidate_router
 from tests.tests_commands import tests_router
 
 
-memory = MemoryStorage()
+load_dotenv()
+
+mongo_url = os.environ.get('MONGO_DB_CONNECTION')
+
+memory = MongoStorage.from_url(url=mongo_url)
 bot = Bot(TELEGRAM_BOT_TOKEN)
 dp = Dispatcher(storage=memory)
 # Регистрируем роутеры.

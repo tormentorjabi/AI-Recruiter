@@ -1,3 +1,10 @@
+from aiogram.utils.markdown import bold
+
+def escape_markdown(text: str) -> str:
+    """Экранирование запрещенных в MarkdownV2 символов"""
+    escape_chars = '_*[]()~`>#+-=|{}.!'
+    return ''.join(f'\\{char}' if char in escape_chars else char for char in str(text))
+
 #-----------------
 # General constants
 #-----------------
@@ -203,15 +210,15 @@ def detail_text_message(
     score: float,
     decision: str,
     date,
-    status
+    status: str
 ) -> str:
     return (
-            f"👤 Кандидат: {candidate_name}\n\n"
-            f"📌 Вакансия: {vacancy_title}\n\n"
-            f"⭐ Оценка GigaChat: *{score}*\n\n"
-            f"⚙️ Решение GigaChat: *{decision}*\n\n"
-            f"📅 Оценка получена: {date}\n\n"
-            f"🔄 Статус по решению от HR: *{status}*"
+            f"👤 Кандидат: {escape_markdown(candidate_name)}\n\n"
+            f"📌 Вакансия: {escape_markdown(vacancy_title)}\n\n"
+            f"⭐ Оценка GigaChat: *{escape_markdown(score)}*\n\n"
+            f"⚙️ Решение GigaChat: {bold(escape_markdown(decision))}\n\n"
+            f"📅 Оценка получена: {escape_markdown(date)}\n\n"
+            f"🔄 Статус по решению от HR: {bold(escape_markdown(status))}"
     )
 
 def candidate_answers_message(
