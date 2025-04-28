@@ -1,8 +1,24 @@
 import requests
 from bs4 import BeautifulSoup
 import re
+from datetime import date
+from dotenv import load_dotenv
+import os
 
-url = "https://ekaterinburg.hh.ru/resume/0343600aff0c1b1b130039ed1f4a7a6e7a494c"
+load_dotenv()
+
+
+def parse_russian_date(date_str: str) -> date:
+    months = {
+        'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4,
+        'мая': 5, 'июня': 6, 'июля': 7, 'августа': 8,
+        'сентября': 9, 'октября': 10, 'ноября': 11, 'декабря': 12
+    }
+    parts = date_str.strip().split()
+    day = int(parts[0])
+    month = months[parts[1]]
+    year = int(parts[2])
+    return date(year, month, day)
 
 def get_resume(url):
     headers = {
@@ -10,13 +26,20 @@ def get_resume(url):
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     }
     cookies = {
-    "hhuid": "",
-    "hhtoken": "",
+    "hhuid": os.getenv("HH_UID"),
+    "hhtoken": os.getenv("HH_TOKEN"),
     }
     response = requests.get(url, headers=headers, cookies=cookies)
 
     if response.status_code == 200:
         soup = BeautifulSoup(response.text, "html.parser")
+
+        # Дата рождения
+        try:
+            birthday_tag = soup.find('span', {'data-qa': 'resume-personal-birthday'})
+            birthdate = parse_russian_date(birthday_tag.text) if birthday_tag else None
+        except Exception as e:
+            birthdate = None
 
         # Имя
         h2 = soup.find("h2", {"data-qa": "resume-personal-name"})
@@ -25,6 +48,45 @@ def get_resume(url):
         else:
             name = "ФИО не указанно"
         # Сколько лет
+
+        # Адрес (город проживания)
+        try:
+            address_tag = soup.find('span', {'data-qa': 'resume-personal-address'})
+            address = address_tag.text.strip() if address_tag else "Адрес не указан"
+        except:
+            address = "Адрес не указан"
+
+        # Гражданство
+        try:
+            citizenship = "Гражданство не указано"
+            paragraphs = soup.find_all('p')
+            for p in paragraphs:
+                text = p.get_text(strip=True)
+                if text.startswith("Гражданство"):
+                    citizenship = text.replace("Гражданство:", "").strip()
+                    break
+        except:
+            citizenship = "Гражданство не указано"
+
+        # Готовность к переезду (bool)
+        try:
+            relocation_info_p = soup.find('p', string=lambda text: text and 'переезду' in text)
+            if relocation_info_p:
+                relocation_text = relocation_info_p.get_text(strip=True).lower()
+                ready_to_relocate = "готов к переезду" in relocation_text or "готова к переезду" in relocation_text
+            else:
+                ready_to_relocate = False
+        except:
+            ready_to_relocate = False
+
+        # Статус поиска работы
+        try:
+            status_span = soup.find("span", {"data-qa": "job-search-status"})
+            job_search_status = status_span.get_text(strip=True) if status_span else "Статус не указан"
+        except:
+            job_search_status = "Статус не указан"
+
+        # Возраст
         try:
             age = soup.find("span", {"data-qa": "resume-personal-age"}).text.strip()
             match = re.search(r'(\d+)', age) 
@@ -132,9 +194,7 @@ def get_resume(url):
         employment_summary = f"Занятость: {employment['Занятость']}; График работы: {employment['График работы']}"
 
 
-        all_data= [name, age, position, salary, experience_summary, skills_summary, employment_summary]
+        all_data= [name, age, position, salary, experience_summary, skills_summary, employment_summary, birthdate, address, citizenship, ready_to_relocate, job_search_status]
         return all_data
     else:
         print(f"Ошибка: статус код {response.status_code}")
-
-a = get_resume(url)
