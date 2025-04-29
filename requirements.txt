@@ -9,4 +9,4 @@ motor==3.7.0
 pymongo[srv]==4.12.0
 psycopg2==2.9.10
 beautifulsoup4==4.13.4
-Requests==2.32.3
+aiohttp==3.11.18
