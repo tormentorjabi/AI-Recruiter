@@ -40,18 +40,18 @@ class WorkExperience:
 
 @dataclass
 class ResumeData:
-    name: str
-    age: Union[int, str]
+    name: Optional[str]
+    age: Optional[Union[int, str]]
     birthdate: Optional[date]
-    address: str
-    citizenship: str
-    ready_to_relocate: bool
-    job_search_status: str
-    salary: Union[int, str]
-    position: str
-    skills: List[str]
-    experiences: List[WorkExperience]
-    employment: EmploymentInfo
+    address: Optional[str]
+    citizenship: Optional[str]
+    ready_to_relocate: Optional[bool]
+    job_search_status: Optional[str]
+    salary: Optional[Union[int, str]]
+    position: Optional[str]
+    skills: Optional[List[str]]
+    experiences: Optional[List[WorkExperience]]
+    employment: Optional[EmploymentInfo]
     
     def to_list(self) -> list:
         experience_summary = None
