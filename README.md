@@ -32,6 +32,8 @@
 
 `src/gigachat_module` - модуль логики работы с моделью GigaChat
 
+`src/gigachat_module/utils` - вспомогательные функции
+
 ### Тестирование
 
 `tests` - тесты
