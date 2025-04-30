@@ -139,7 +139,7 @@ def _extract_text(
     soup: BeautifulSoup, 
     selector: str, 
     default: str = "Не указано"
-) -> Union[str, None]:
+) -> Optional[str]:
     try:
         element = soup.select_one(selector)
         return element.text.strip() if element else default
@@ -148,7 +148,7 @@ def _extract_text(
         return None
 
 
-def _extract_citizenship(soup: BeautifulSoup) -> Union[str, None]:
+def _extract_citizenship(soup: BeautifulSoup) -> Optional[str]:
     try:
         for p in soup.find_all('p'):
             text = p.get_text(strip=True)
@@ -160,19 +160,21 @@ def _extract_citizenship(soup: BeautifulSoup) -> Union[str, None]:
         return None
    
 
-def _extract_relocation_info(soup: BeautifulSoup) -> Union[bool, None]:
+def _extract_relocation_info(soup: BeautifulSoup) -> Optional[bool]:
     try:
-        relocation_info_p = soup.find('p', string=lambda text: text and 'переезду' in text)
+        relocation_info_p = soup.find('div', class_='bloko-translate-guard').find('p')
         if relocation_info_p:
             relocation_text = relocation_info_p.get_text(strip=True).lower()
-            return False if ["не готов к переезду", "не готова к переезду"] in relocation_text else True
+            if "не готов к переезду" in relocation_text or "не готова к переезду" in relocation_text:
+                return False
+            return True
         return None
     except Exception as e:
         logger.error(f'Error in _extract_relocation_info: {str(e)}')
         return None
 
 
-def _extract_age(soup: BeautifulSoup) -> Union[int, None]:
+def _extract_age(soup: BeautifulSoup) -> Optional[int]:
     try:
         age_element = soup.find("span", {"data-qa": "resume-personal-age"}).text.strip()
         if age_element:
@@ -184,7 +186,7 @@ def _extract_age(soup: BeautifulSoup) -> Union[int, None]:
         return None
     
 
-def _extract_salary(soup: BeautifulSoup) -> Union[int, None]:
+def _extract_salary(soup: BeautifulSoup) -> Optional[int]:
     try:
         salary_element = soup.find("span", {"data-qa": "resume-block-salary"}) 
         if salary_element:
