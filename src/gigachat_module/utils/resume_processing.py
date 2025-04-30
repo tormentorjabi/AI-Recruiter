@@ -8,15 +8,17 @@ from src.gigachat_module.parser import parse_multiple_resumes, parse_resume
 from src.database.utils.entry_creation import create_candidates_entries
 
 from src.database.session import Session
-from src.database.models import Vacancy
+from src.database.models import Vacancy, BotQuestion
+
+from tests.bot_questions_data import QUESTION_DATA
 
 logger = logging.getLogger(__name__)
 
 
-def get_resumes_data() -> List[Tuple[str, int]]:
+def fetch_new_resumes_data() -> List[Tuple[str, int]]:
     '''
         TODO:
-            - Возвращать список URL+вакансия
+            - Возвращать список URL+вакансия(+ её создание)
     '''
     with Session() as db:
         try:
@@ -29,6 +31,16 @@ def get_resumes_data() -> List[Tuple[str, int]]:
             db.flush()
             
             vacancy_id = vacancy.id
+            
+            for q_data in QUESTION_DATA:
+                question = BotQuestion(
+                    vacancy_id = vacancy.id,
+                    question_text = q_data['question_text'],
+                    order = q_data['order'],
+                    expected_format = q_data['expected_format'],
+                    choices = q_data['choices']
+                )
+                db.add(question)
             
             db.commit()
         except Exception as e:
@@ -52,7 +64,7 @@ async def resume_processing_task(delay_hours: int = 24) -> None:
                         вообще весь проект без API HH не работает, так как иначе ссылки на резюме нужно ручками
                         кидать HR'у, что как бы хрень какая-то.
             '''
-            resumes_data = get_resumes_data()              
+            resumes_data = fetch_new_resumes_data()              
             parsed_results = await parse_multiple_resumes(resumes_data=resumes_data)
             await create_candidates_entries(resumes=parsed_results)
                 
