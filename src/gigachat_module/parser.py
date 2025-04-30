@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
+'''
+    TODO:
+        - Данные об образовании (см. models/Education);
+        - Данные об уровне владения навыком (см models/CandidateSkill.proficiency)
+'''
+
+
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"
@@ -28,11 +36,11 @@ COOKIES = {
 
 @dataclass
 class EmploymentInfo:
-    employment_type: str
-    work_schedule: str
+    employment_type: Optional[str]
+    work_schedule: Optional[str]
 
 @dataclass
-class WorkExperience:
+class WorkExperienceInfo:
     company: str
     position: str
     # Период работы хранится в формате: 
@@ -44,17 +52,18 @@ class WorkExperience:
 @dataclass
 class ResumeData:
     link: str
+    vacancy_id: int
     name: Optional[str]
-    age: Optional[Union[int, str]]
+    age: Optional[int]
     birthdate: Optional[date]
     address: Optional[str]
     citizenship: Optional[str]
     ready_to_relocate: Optional[bool]
     job_search_status: Optional[str]
-    salary: Optional[Union[int, str]]
+    salary: Optional[int]
     position: Optional[str]
     skills: Optional[List[str]]
-    experiences: Optional[List[WorkExperience]]
+    experiences: Optional[List[WorkExperienceInfo]]
     employment: Optional[EmploymentInfo]
     
     def to_list(self) -> list:
@@ -250,7 +259,7 @@ def _parse_date_entry(entry: str) -> Tuple[Optional[str], Optional[str]]:
         return None, None
     
 
-def _extract_experiences(soup: BeautifulSoup) -> List[WorkExperience]:
+def _extract_experiences(soup: BeautifulSoup) -> List[WorkExperienceInfo]:
     try:
         experiences = []
         experience_section = soup.find("div", {"data-qa": "resume-block-experience"})
@@ -265,7 +274,7 @@ def _extract_experiences(soup: BeautifulSoup) -> List[WorkExperience]:
             period = block.find("div", {"class": "bloko-column bloko-column_xs-4 bloko-column_s-2 bloko-column_m-2 bloko-column_l-2"})
             description = block.find("div", {"data-qa": "resume-block-experience-description"})
             # Очищаем данные, собираем опыт вместе
-            experience = WorkExperience(
+            experience = WorkExperienceInfo(
                 company=company.text.strip().replace('\xa0', ' ').replace('\n', ' ') if company else "",
                 position=position.text.strip().replace('\xa0', ' ').replace('\n', ' ') if position else "",
                 period=_parse_date_entry(period.text.strip().replace('\xa0', ' ')) if period else "",
@@ -298,7 +307,7 @@ def _extract_skills(soup: BeautifulSoup) -> List[str]:
         return None
     
 
-def _extract_employment_info(soup: BeautifulSoup) -> Union[EmploymentInfo, None]:
+def _extract_employment_info(soup: BeautifulSoup) -> Optional[EmploymentInfo]:
     try:
         employment_type = None
         work_schedule = None
@@ -328,6 +337,7 @@ def _extract_employment_info(soup: BeautifulSoup) -> Union[EmploymentInfo, None]
 
 async def parse_resume(
     url: str,
+    vacancy_id: int,
     session: Optional[aiohttp.ClientSession] = None
 ) -> Optional[ResumeData]:
     close_session = False
@@ -360,6 +370,7 @@ async def parse_resume(
         
         return ResumeData(
             link=link,
+            vacancy_id=vacancy_id,
             name=name,
             age=age,
             birthdate=birthdate,
@@ -383,7 +394,10 @@ async def parse_resume(
             await session.close()
             
             
-async def parse_multiple_resumes(urls: List[str]) -> List[Optional[ResumeData]]:
+async def parse_multiple_resumes(resumes_data: List[Tuple[str, int]]) -> List[Optional[ResumeData]]:
     async with aiohttp.ClientSession() as session:
-        tasks = [parse_resume(url, session) for url in urls]
+        tasks = [
+            parse_resume(url, vacancy_id, session) 
+            for url, vacancy_id in resumes_data
+        ]
         return await asyncio.gather(*tasks, return_exceptions=True)
