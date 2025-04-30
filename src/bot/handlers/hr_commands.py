@@ -270,13 +270,19 @@ async def _show_notification_detail(callback: CallbackQuery):
             candidate_name = db.query(Candidate).get(notification.candidate_id).full_name
             vacancy_title = db.query(Vacancy).get(notification.vacancy_id).title
             
+            hr_name = None
+            if notification.status in ['processing', 'approved', 'declined']:
+                hr = notification.application.hr_specialist
+                hr_name = hr.full_name
+
             detail_text = msg_templates.detail_text_message(
                 candidate_name=candidate_name,
                 vacancy_title=vacancy_title,
                 score=notification.analysis_score,
                 decision=get_status_display(notification.final_decision)[2:],
                 date=notification.sent_at.strftime('%Y-%m-%d'),
-                status=get_status_display(notification.status)[2:]
+                status=get_status_display(notification.status)[2:],
+                hr=hr_name
             )
             
             action_buttons = []
@@ -366,10 +372,10 @@ async def _get_candidate_resume(callback: CallbackQuery):
             ).first()
             
             if resume:
-                # TODO:
-                # Возвращать ссылку на резюме? Надо хранить его в БД тогда
-                await callback.message.answer(f"ID Резюме в БД: {resume.id}")
-                # await callback.message.answer_document(resume.file_id)
+                await callback.message.answer(
+                    msg_templates.link_to_candidate_resume_message(link=resume.resume_link),
+                    parse_mode="MarkdownV2"
+                )
             else:
                 await callback.message.answer(msg_templates.NO_RESUME_FOR_REVIEW)
         await callback.answer()
@@ -388,8 +394,16 @@ async def _start_processing(callback: CallbackQuery):
         notification_id = int(callback.data.split("_")[-1])
         
         with Session() as db:
+            hr_to_process = db.query(HrSpecialist).filter_by(
+                telegram_id=str(callback.from_user.id)
+            ).first()
+            
             notification = db.query(HrNotification).get(notification_id)
             notification.status = "processing"
+            
+            application = notification.application
+            application.hr_specialist_id = hr_to_process.id
+            
             db.commit()
             
             await callback.answer(msg_templates.MARK_REVIEW_AS_PROCESSING)
