@@ -1,3 +1,71 @@
+TEST_QUESTION_DATA_1 = [
+    {
+        'question_text': 'вопрос 1',
+        'expected_format': 'TEXT',
+        'order': 1,
+        'choices': None
+    },
+    {
+        'question_text': 'вопрос 2',
+        'expected_format': 'TEXT',
+        'order': 2,
+        'choices': None
+    },
+    {
+        'question_text': 'вопрос с выбором',
+        'expected_format': 'CHOICE',
+        'order': 3,
+        'choices': ["Туда", "Сюда"]
+    },
+    {
+        'question_text': 'ещё вопросик вот с текстом',
+        'expected_format': 'TEXT',
+        'order': 4,
+        'choices': None
+    },
+    {
+       'question_text': 'ещё на выбор ответа',
+       'expected_format': 'CHOICE',
+       'order': 5,
+       'choices': ["шучу, выбора нет"]
+    }
+]
+
+
+TEST_QUESTION_DATA_2 = [
+    {
+       'question_text': 'а тут другие вопросы',
+       'expected_format': 'CHOICE',
+       'order': 1,
+       'choices': ["Круто", "Нифигасе"]
+    },
+    {
+       'question_text': 'и на выбор есть',
+       'expected_format': 'CHOICE',
+       'order': 2,
+       'choices': ["норм", "норм"]
+    },
+    {
+       'question_text': 'Здарова',
+       'expected_format': 'CHOICE',
+       'order': 3,
+       'choices': ["Нет", "Нет"]
+    },
+    {
+       'question_text': 'Ну ещё чтлль один добавить',
+       'expected_format': 'CHOICE',
+       'order': 4,
+       'choices': ["Да", "Нет"]
+    },
+    {
+       'question_text': 'Если ответили "Да" - молодцы',
+       'expected_format': 'TEXT',
+       'order': 5,
+       'choices': None
+    }
+]
+
+
 QUESTION_DATA = [
     {
         'question_text': 'Укажите пожалуйста ваше полное Имя Фамилию Отчество?',
@@ -27,7 +95,7 @@ QUESTION_DATA = [
        'question_text': 'Сколько вам полных лет?',
        'expected_format': 'CHOICE',
        'order': 5,
-       'choices': ["18-23", "24-35", "36-42", ">42"]
+       'choices': ["<18", "18-23", "24-35", "36-42", ">42"]
     },
     {
        'question_text': 'Есть ли у вас опыт работы в Контактном центре?',
