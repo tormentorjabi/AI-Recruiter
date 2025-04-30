@@ -25,12 +25,12 @@ BACK_TO_LIST = (
 # Constants used in candidate_commands.py
 #-----------------
 def get_candidate_on_start_bot_interaction_message(
-    db_candidate_full_name: str, 
+    db_candidate_full_name: Optional[str], 
     vacancy_title: str, 
     questions_length: int
 ) -> str:
     return (
-        f"Приветствуем вас, {db_candidate_full_name}!\n\n"
+        f"Приветствуем вас, {db_candidate_full_name if db_candidate_full_name else "уважаемый кандидат"}!\n\n"
         f"В рамках вашего отклика по вакансии: `{vacancy_title}` "
         f"вам необходимо пройти опрос, состоящий из `{questions_length} вопросов`.\n"
         "Без прохождения данного опроса, мы не сможем вынести окончательное решение "
