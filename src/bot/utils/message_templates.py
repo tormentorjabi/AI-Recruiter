@@ -1,3 +1,4 @@
+from typing import Optional
 from aiogram.utils.markdown import bold
 
 def escape_markdown(text: str) -> str:
@@ -195,6 +196,11 @@ def confirm_change_work_mode_message(work_mode: bool) -> str:
         "Введите [Да/Нет] для подтверждения:"
     )
 
+def link_to_candidate_resume_message(link: str) -> str:
+    return (
+        f"[{escape_markdown("Ссылка на резюме кандидата на HH.ru")}]({link})"
+    )
+
 def work_mode_changed_message(
     status_text: str,
     status: bool
@@ -210,15 +216,20 @@ def detail_text_message(
     score: float,
     decision: str,
     date,
-    status: str
+    status: str,
+    hr: Optional[str]
 ) -> str:
+    hr_info = ""
+    if hr:
+        hr_info = f"🧑‍💻 HR курирующий отклик: {bold(escape_markdown(hr))}"
     return (
             f"👤 Кандидат: {escape_markdown(candidate_name)}\n\n"
             f"📌 Вакансия: {escape_markdown(vacancy_title)}\n\n"
             f"⭐ Оценка GigaChat: *{escape_markdown(score)}*\n\n"
             f"⚙️ Решение GigaChat: {bold(escape_markdown(decision))}\n\n"
             f"📅 Оценка получена: {escape_markdown(date)}\n\n"
-            f"🔄 Статус по решению от HR: {bold(escape_markdown(status))}"
+            f"🔄 Статус по обработке от HR: {bold(escape_markdown(status))}\n\n"
+            + hr_info
     )
 
 def candidate_answers_message(
