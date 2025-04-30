@@ -33,7 +33,8 @@ async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData)
     '''Процессинг единичного резюме с созданием всех необходимых моделей'''
     candidate = _create_candidate(db, resume_data)
     application = _create_application(db, resume_data, candidate.id)
-    _handle_application_token(db, application.id)
+    t = _handle_application_token(db, application.id)
+    logger.warning(f'Готовый для отправки кандидату - {candidate.full_name} токен: {t}')
     
     resume = _create_resume(db, resume_data, candidate.id, application.id)
     
@@ -98,6 +99,8 @@ def _handle_application_token(db: SqlAlchemySession, application_id: int) -> Non
     generated_token = set_application_token(db, application_id)
     if not generated_token:
         logger.error(f"Generated token for application: {application_id} was None.")
+        return None
+    return generated_token
 
 
 def _create_resume(db: SqlAlchemySession, resume_data: ResumeData, candidate_id: int, application_id: int) -> Resume:
