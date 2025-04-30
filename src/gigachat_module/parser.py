@@ -165,7 +165,7 @@ def _extract_relocation_info(soup: BeautifulSoup) -> Union[bool, None]:
         relocation_info_p = soup.find('p', string=lambda text: text and 'переезду' in text)
         if relocation_info_p:
             relocation_text = relocation_info_p.get_text(strip=True).lower()
-            return True if ["готов к переезду", "готова к переезду"] in relocation_text else False
+            return False if ["не готов к переезду", "не готова к переезду"] in relocation_text else True
         return None
     except Exception as e:
         logger.error(f'Error in _extract_relocation_info: {str(e)}')
