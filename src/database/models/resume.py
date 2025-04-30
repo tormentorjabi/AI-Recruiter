@@ -19,6 +19,7 @@ class Resume(Base):
     Fields:
         candidate_id (int): FK на соискателя по вакансии
         application_id (int): FK на отклик
+        resume_link (text): Ссылка на резюме на HH.ru
         parsed_text (text): Подготовленные и обобщённые данные резюме, для его отправки в GigaChat
         gigachat_response (JSONB): Последний результат GigaChat по резюме
         analysis_status (str): Текущий статус обработки резюме
@@ -30,6 +31,7 @@ class Resume(Base):
     id = Column(Integer, primary_key=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
     application_id = Column(Integer, ForeignKey('applications.id'))
+    resume_link = Column(Text)
     # В процессе подготовки обработки резюме GigaChat'ом, скорее всего, мы будем
     # конструировать разные данные о кандидате (данные с разных записей в БД)
     # по типу: "Имя+Возраст+Город+Желаемая_зарплата" и т.д.
