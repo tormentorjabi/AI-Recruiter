@@ -8,7 +8,7 @@ from datetime import date
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from dataclasses import dataclass
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -35,11 +35,15 @@ class EmploymentInfo:
 class WorkExperience:
     company: str
     position: str
-    period: str
+    # Период работы хранится в формате: 
+    # 1) Tuple['YYYY-MM', 'YYYY-MM'] - если дата окончания имеется
+    # 2) Tuple['YYYY-MM', None] - если работа по настоящее время
+    period: Tuple[Optional[str], Optional[str]]
     description: str
 
 @dataclass
 class ResumeData:
+    link: str
     name: Optional[str]
     age: Optional[Union[int, str]]
     birthdate: Optional[date]
@@ -72,6 +76,7 @@ class ResumeData:
             employment_summary = f"Занятость: {self.employment.employment_type}; График работы: {self.employment.work_schedule}"
             
         return [
+            self.link,
             self.name,
             self.age,
             self.birthdate,
@@ -180,7 +185,71 @@ def _extract_salary(soup: BeautifulSoup) -> Union[int, None]:
         logger.error(f'Error in _extract_salary: {str(e)}')
         return None
     
+
+def _parse_month_year(month_year_str: str) -> Optional[str]:
+    month_map = {
+        'январь': '01', 'января': '01',
+        'февраль': '02', 'февраля': '02',
+        'март': '03', 'марта': '03',
+        'апрель': '04', 'апреля': '04',
+        'май': '05', 'мая': '05',
+        'июнь': '06', 'июня': '06',
+        'июль': '07', 'июля': '07',
+        'август': '08', 'августа': '08',
+        'сентябрь': '09', 'сентября': '09',
+        'октябрь': '10', 'октября': '10',
+        'ноябрь': '11', 'ноября': '11',
+        'декабрь': '12', 'декабря': '12'
+    }
     
+    try:
+        parts = month_year_str.split()
+        if len(parts) < 2:
+            return None
+        
+        month_part = parts[0].lower()
+        year = parts[1]
+        
+        if len(year) > 4:
+            year = year[:4]
+        
+        month = month_map.get(month_part)
+        if not month:
+            return None
+        
+        return f'{year}-{month}'
+        
+    except Exception as e:
+        logger.error(f'Error while trying to _parse_month_year: {month_year_str}.\nError:{str(e)}')
+        return None
+
+
+def _parse_date_entry(entry: str) -> Tuple[Optional[str], Optional[str]]:
+    try:
+        lines = entry.split('\n')
+        if len(lines) < 1:
+            return None, None
+        
+        date_range = lines[0].strip()
+        
+        if "по настоящее время" in date_range:
+            start_part = date_range.split("—")[0].strip()
+            start_date = _parse_month_year(start_part)
+            return start_date, None
+        
+        if "—" in date_range:
+            start_part, end_part = date_range.split("—")
+            start_date = _parse_month_year(start_part.strip())
+            end_date = _parse_month_year(end_part.strip())
+            return start_date, end_date
+        
+        return None, None
+            
+    except Exception as e:
+        logger.error(f'Error while trying to parse date entry: {entry}.\nError:{str(e)}')
+        return None, None
+    
+
 def _extract_experiences(soup: BeautifulSoup) -> List[WorkExperience]:
     try:
         experiences = []
@@ -199,7 +268,7 @@ def _extract_experiences(soup: BeautifulSoup) -> List[WorkExperience]:
             experience = WorkExperience(
                 company=company.text.strip().replace('\xa0', ' ').replace('\n', ' ') if company else "",
                 position=position.text.strip().replace('\xa0', ' ').replace('\n', ' ') if position else "",
-                period=period.text.strip().replace('\xa0', ' ').replace('\n', ' ') if period else "",
+                period=_parse_date_entry(period.text.strip().replace('\xa0', ' ')) if period else "",
                 description=description.text.strip().replace('\xa0', ' ').replace('\n', ' ') if description else ""
             )
             # Проверка на дубли
@@ -257,7 +326,7 @@ def _extract_employment_info(soup: BeautifulSoup) -> Union[EmploymentInfo, None]
         return None
     
 
-async def get_resume(
+async def parse_resume(
     url: str,
     session: Optional[aiohttp.ClientSession] = None
 ) -> Optional[ResumeData]:
@@ -273,6 +342,7 @@ async def get_resume(
             return None
         soup = BeautifulSoup(html, "html.parser")
 
+        link = url
         birthday_tag = soup.find('span', {'data-qa': 'resume-personal-birthday'})
         birthdate = _parse_russian_date(birthday_tag.text) if birthday_tag else None
         name = _extract_text(soup, "h2[data-qa='resume-personal-name']", "ФИО не указано")
@@ -288,6 +358,7 @@ async def get_resume(
         employment = _extract_employment_info(soup)
         
         return ResumeData(
+            link=link,
             name=name,
             age=age,
             birthdate=birthdate,
@@ -311,7 +382,7 @@ async def get_resume(
             await session.close()
             
             
-async def get_multiple_resumes(urls: List[str]) -> List[Optional[ResumeData]]:
+async def parse_multiple_resumes(urls: List[str]) -> List[Optional[ResumeData]]:
     async with aiohttp.ClientSession() as session:
-        tasks = [get_resume(url, session) for url in urls]
+        tasks = [parse_resume(url, session) for url in urls]
         return await asyncio.gather(*tasks, return_exceptions=True)
