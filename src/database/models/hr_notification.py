@@ -38,7 +38,7 @@ class HrNotification(Base):
     
     id = Column(Integer, primary_key=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
-    hr_specialist_id = Column(Integer, ForeignKey('hr_specialists.id'))
+    hr_specialist_id = Column(Integer, ForeignKey('hr_specialists.id'), nullable=True)
     vacancy_id = Column(Integer, ForeignKey('vacancies.id'))
     application_id = Column(Integer, ForeignKey('applications.id'))
     channel = Column(String(20), server_default='telegram')

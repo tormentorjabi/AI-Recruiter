@@ -811,20 +811,19 @@ async def handle_proceed_to_llm(
             db.flush()
             
             decision = analysis_result.final_decision
+            
             # Создаем уведомления для HR
-            for hr in db.query(HrSpecialist).all():
-                notification = HrNotification(
-                    candidate_id=candidate_id,
-                    hr_specialist_id=hr.id,
-                    application_id=application_id,
-                    vacancy_id=vacancy_id,
-                    channel='telegram',
-                    analysis_score=analysis_score,
-                    final_decision=decision,           
-                    status="new",
-                    sent_at=datetime.utcnow()
-                )
-                db.add(notification)
+            notification = HrNotification(
+                candidate_id=candidate_id,
+                application_id=application_id,
+                vacancy_id=vacancy_id,
+                channel='telegram',
+                analysis_score=analysis_score,
+                final_decision=decision,           
+                status="new",
+                sent_at=datetime.utcnow()
+            )
+            db.add(notification)
             
             db.commit()
             
