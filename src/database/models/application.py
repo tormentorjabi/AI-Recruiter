@@ -24,6 +24,7 @@ class Application(Base):
     Fields:
         candidate_id (int): FK на соискателя по вакансии
         vacancy_id (id): FK на вакансию
+        hr_specialist_id (id): FK на HR специалиста, курирующего вердикт по отклику
         status (enum): Статус заявки ('active', 'accepted', 'rejected')
         application_date (datetime): Дата получения отклика
         auth_token (str): Токен, для идентификации кандидата по отклику в Telegram боте
@@ -34,6 +35,7 @@ class Application(Base):
     id = Column(Integer, primary_key=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
     vacancy_id = Column(Integer, ForeignKey('vacancies.id'))
+    hr_specialist_id = Column(Integer, ForeignKey('hr_specialists.id'), nullable=True)
     status = Column(Enum(ApplicationStatus), default=ApplicationStatus.ACTIVE)
     application_date = Column(DateTime)
     auth_token = Column(String, nullable=True, unique=True, index=True)
@@ -41,6 +43,7 @@ class Application(Base):
     
     candidate = relationship("Candidate", back_populates="applications")
     vacancy = relationship("Vacancy", back_populates="applications")
+    hr_specialist = relationship("HrSpecialist", back_populates="applications")
     resume = relationship("Resume", back_populates="application")
     analysis_results = relationship("AnalysisResult", back_populates="application")
     interaction = relationship("BotInteraction", back_populates="application")

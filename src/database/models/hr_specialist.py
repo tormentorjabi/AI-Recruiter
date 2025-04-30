@@ -16,7 +16,7 @@ class HrSpecialist(Base):
     
     Fields:
         telegram_id (str): ID HR-специалиста в Telegram
-        full_name (sdr): ФИО HR-специалиста
+        full_name (str): ФИО HR-специалиста
         is_approved (boolean): Статус подтверждения регистрации профиля Telegram в нашей системе
         work_mode (boolean): Готовность получения уведомлений о кандидатах (Готов/Не готов)
         created_at (datetime): Время создания записи
@@ -43,4 +43,5 @@ class HrSpecialist(Base):
     notifications = relationship("HrNotification",
                                  foreign_keys="[HrNotification.hr_specialist_id]", 
                                  back_populates="hr_specialist")
+    applications = relationship("Application", back_populates="hr_specialist")
     
