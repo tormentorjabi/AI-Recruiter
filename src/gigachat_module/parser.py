@@ -349,7 +349,8 @@ async def parse_resume(
         address = _extract_text(soup, "span[data-qa='resume-personal-address']", "Адрес не указан")
         citizenship = _extract_citizenship(soup)
         ready_to_relocate = _extract_relocation_info(soup)
-        job_search_status = _extract_text(soup, "span[data-qa='job-search-status']", "Статус не указан")
+        job_search_status_text = _extract_text(soup, "span[data-qa='job-search-status']", "Статус не указан")
+        job_search_status = job_search_status_text.replace('\xa0', ' ') if job_search_status_text else None
         age = _extract_age(soup)
         position = _extract_text(soup, "span[data-qa='resume-block-title-position']", "Должность не указана")
         salary = _extract_salary(soup)
