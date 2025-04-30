@@ -18,6 +18,7 @@ class Candidate(Base):
     Fields:
         full_name (str): Полное имя
         birth_date (date): Дата рождения
+        age (int): Возраст
         city (str): Город проживания
         citizenship (str): Гражданство
         relocation_ready (bool): Готовность к переезду
@@ -31,6 +32,7 @@ class Candidate(Base):
     id = Column(Integer, primary_key=True)
     full_name = Column(String(255), nullable=True)
     birth_date = Column(Date, nullable=True)
+    age = Column(Integer, nullable=True)
     city = Column(String(100), nullable=True)
     citizenship = Column(String(100), nullable=True)
     relocation_ready = Column(Boolean, nullable=True)
