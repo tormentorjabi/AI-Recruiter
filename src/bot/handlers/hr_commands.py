@@ -420,8 +420,15 @@ async def _approve_candidate(callback: CallbackQuery):
         notification_id = int(callback.data.split("_")[-1])
         
         with Session() as db:
+            hr_to_approve = db.query(HrSpecialist).filter_by(
+                telegram_id=str(callback.from_user.id)
+            ).first()
+            
             notification = db.query(HrNotification).get(notification_id)
             notification.status = "approved"
+            
+            if hr_to_approve.id != notification.application.hr_specialist_id:
+                notification.application.hr_specialist_id = hr_to_approve.id
             
             candidate = db.query(Candidate).get(notification.candidate_id)
             candidate.status = "approved"
@@ -452,8 +459,15 @@ async def _decline_candidate(callback: CallbackQuery):
         notification_id = int(callback.data.split("_")[-1])
         
         with Session() as db:
+            hr_to_decline = db.query(HrSpecialist).filter_by(
+                telegram_id=str(callback.from_user.id)
+            ).first()
+            
             notification = db.query(HrNotification).get(notification_id)
             notification.status = "declined"
+            
+            if hr_to_decline.id != notification.application.hr_specialist_id:
+                notification.application.hr_specialist_id = hr_to_decline.id
             
             candidate = db.query(Candidate).get(notification.candidate_id)
             candidate.status = "declined"
