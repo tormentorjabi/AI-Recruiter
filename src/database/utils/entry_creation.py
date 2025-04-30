@@ -1,8 +1,8 @@
 import logging
 
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime, timezone, date
-
+from sqlalchemy.orm import Session as SqlAlchemySession
 
 from src.database.session import Session
 from src.database.models import (
@@ -19,168 +19,203 @@ from src.gigachat_module.parser import ResumeData
 logger = logging.getLogger(__name__)
 
 
-async def create_candidates_entries(resumes: List[ResumeData | None]):
+async def create_candidates_entries(resumes: List[Optional[ResumeData]]) -> None:
+    '''Создать записи в базе данных для списка кандидатов, по данным с резюме'''
     try:
         with Session() as db:
-            for resume_data in resumes:
-                if resume_data is None:
-                    continue
-
-                candidate = Candidate(
-                    full_name=resume_data.name,
-                    birth_date=resume_data.birthdate,
-                    age=resume_data.age,
-                    city=resume_data.address,
-                    citizenship=resume_data.citizenship,
-                    relocation_ready=resume_data.ready_to_relocate,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc)
-                )
-                db.add(candidate)
-                db.flush()
-                candidate_id = candidate.id
-            
-                application = Application(
-                    candidate_id=candidate_id,
-                    vacancy_id=resume_data.vacancy_id,
-                    status=ApplicationStatus.ACTIVE,
-                    # Не самое важное поле, но можно более точно
-                    # отметить временные из данных отклика (только с API HH)
-                    application_date=datetime.now(timezone.utc)
-                )
-                db.add(application)
-                db.flush()
-
-                application_id = application.id
-                db.commit()
-                # TODO:
-                # - После генерации токена, его нужно проверить на успешную
-                #   генерацию и отправить кандидату.
-                #   send_application_token()
-                generated_application_token_value = set_application_token(
-                    application_id=application_id
-                )
-                if not generated_application_token_value:
-                    logger.error(
-                        f"Generated token for application: {application_id} were None."
-                    )
-                
-                resume = Resume(
-                    candidate_id=candidate_id,
-                    application_id=application_id,
-                    resume_link=resume_data.link,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc)
-                )
-                db.add(resume)
-                db.flush()
-                resume_id = resume.id
-                
-                if resume_data.position and resume_data.salary:
-                    desired_position = DesiredPosition(
-                        resume_id=resume_id,
-                        position=resume_data.position,
-                        salary=resume_data.salary
-                    )
-                    db.add(desired_position)
-                    db.flush()
-                    desired_position_id = desired_position.id
-                
-                if resume_data.employment:
-                    work_schedule = resume_data.employment.work_schedule
-                    employment_type = resume_data.employment.employment_type
-                    
-                    employment_entry = EmploymentType(
-                        type=employment_type
-                    )
-                    work_schedule_entry = WorkSchedule(
-                        schedule=work_schedule
-                    )
-                    db.add(employment_entry)
-                    db.add(work_schedule_entry)
-                    db.flush()
-                    # TODO:
-                    # - Переделать, у человека может быть множество различных типов
-                    #   и графиков, но они они конечны на HH. Пока просто храним большой строкой
-                    employment_id = employment_entry.id
-                    schedule_id = work_schedule_entry.id
-                  
-                if employment_id and desired_position_id:
-                    dpe_entry = DesiredPositionEmployment(
-                        employment_type_id=employment_id,
-                        desired_position_id=desired_position_id
-                    )
-                    db.add(dpe_entry)
-                
-                if schedule_id and desired_position_id:
-                    dps_entry = DesiredPositionSchedule(
-                        schedule_id=schedule_id,
-                        desired_position_id=desired_position_id
-                    )
-                    db.add(dps_entry)
-                
-                if resume_data.skills:
-                    for resume_skill in resume_data.skills:
-                        skill_id = await _create_or_match_skill(resume_skill)
-                        candidate_skill = CandidateSkill(
-                            resume_id=resume_id,
-                            skill_id=skill_id,
-                            proficiency='НАЧАЛЬНЫЙ'
-                        )
-                        db.add(candidate_skill)
-                
-                if resume_data.experiences:
-                    work_experiences = [
-                        WorkExperience(
-                            resume_id=resume_id,
-                            company=experience_element.company,
-                            position=experience_element.position,
-                            description=experience_element.description,
-                            start_date=_parse_ym_date(experience_element.period[0]),
-                            end_date=_parse_ym_date(experience_element.period[1])
-                        )
-                        for experience_element in resume_data.experiences
-                    ]
-                    db.add_all(work_experiences)    
-                
-                db.commit()
-                       
+            for resume_data in filter(None, resumes):
+                await _process_single_resume(db, resume_data)
     except Exception as e:
         logger.error(f'Error in create_candidate_entry: {str(e)}')
-        return
+
+
+async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData) -> None:
+    '''Процессинг единичного резюме с созданием всех необходимых моделей'''
+    candidate = _create_candidate(db, resume_data)
+    application = _create_application(db, resume_data, candidate.id)
+    _handle_application_token(db, application.id)
     
+    resume = _create_resume(db, resume_data, candidate.id, application.id)
     
-async def _create_or_match_skill(
-    skill: Optional[str]
-) -> int:
+    desired_position_id = None
+    if resume_data.position and resume_data.salary:
+        desired_position_id = _create_desired_position(db, resume_data, resume.id)
+    
+    employment_id, schedule_id = _handle_employment_data(
+        db, 
+        resume_data, 
+        desired_position_id
+    )
+    
+    if resume_data.skills:
+        await _process_skills(db, resume_data.skills, resume.id)
+    
+    if resume_data.experiences:
+        _process_experiences(db, resume_data.experiences, resume.id)
+    
+    db.commit()
+
+
+def _create_candidate(db: SqlAlchemySession, resume_data: ResumeData) -> Candidate:
+    '''Создание и наполнение Candidate модели'''
+    now = datetime.now(timezone.utc)
+    candidate = Candidate(
+        full_name=resume_data.name,
+        birth_date=resume_data.birthdate,
+        age=resume_data.age,
+        city=resume_data.address,
+        citizenship=resume_data.citizenship,
+        relocation_ready=resume_data.ready_to_relocate,
+        created_at=now,
+        updated_at=now
+    )
+    db.add(candidate)
+    db.flush()
+    return candidate
+
+
+def _create_application(db: SqlAlchemySession, resume_data: ResumeData, candidate_id: int) -> Application:
+    '''Создание и наполнение Application модели'''
+    application = Application(
+        candidate_id=candidate_id,
+        vacancy_id=resume_data.vacancy_id,
+        status=ApplicationStatus.ACTIVE,
+        # Не самое важное поле, но можно более точно
+        # отметить временные из данных отклика (только с API HH)            
+        application_date=datetime.now(timezone.utc)
+    )
+    db.add(application)
+    db.flush()
+    return application
+
+
+def _handle_application_token(db: SqlAlchemySession, application_id: int) -> None:
+    '''Генерация и установка токена идентификации кандидата'''
+    # TODO:
+    # - После генерации токена, его нужно проверить на успешную
+    #   генерацию и отправить кандидату.
+    #   send_application_token()
+    generated_token = set_application_token(db, application_id)
+    if not generated_token:
+        logger.error(f"Generated token for application: {application_id} was None.")
+
+
+def _create_resume(db: SqlAlchemySession, resume_data: ResumeData, candidate_id: int, application_id: int) -> Resume:
+    '''Создание и наполнение Resume модели'''
+    now = datetime.now(timezone.utc)
+    resume = Resume(
+        candidate_id=candidate_id,
+        application_id=application_id,
+        resume_link=resume_data.link,
+        created_at=now,
+        updated_at=now
+    )
+    db.add(resume)
+    db.flush()
+    return resume
+
+
+def _create_desired_position(db: SqlAlchemySession, resume_data: ResumeData, resume_id: int) -> int:
+    '''Создание и наполнение DesiredPosition модели'''
+    desired_position = DesiredPosition(
+        resume_id=resume_id,
+        position=resume_data.position,
+        salary=resume_data.salary
+    )
+    db.add(desired_position)
+    db.flush()
+    return desired_position.id
+
+
+def _handle_employment_data(
+    db: SqlAlchemySession, 
+    resume_data: ResumeData, 
+    desired_position_id: Optional[int]
+) -> tuple[Optional[int], Optional[int]]:
+    '''
+        Создание и наполнение EmploymentType и WorkSchedule моделей 
+        и разрешение M:M связей с DesiredPosition моделью
+    '''
+    employment_id = schedule_id = None
+    
+    if resume_data.employment:
+        employment_entry = EmploymentType(type=resume_data.employment.employment_type)
+        work_schedule_entry = WorkSchedule(schedule=resume_data.employment.work_schedule)
+        
+        db.add(employment_entry)
+        db.add(work_schedule_entry)
+        db.flush()
+        
+        employment_id = employment_entry.id
+        schedule_id = work_schedule_entry.id
+        
+        if desired_position_id:
+            if employment_id:
+                db.add(DesiredPositionEmployment(
+                    employment_type_id=employment_id,
+                    desired_position_id=desired_position_id
+                ))
+            if schedule_id:
+                db.add(DesiredPositionSchedule(
+                    schedule_id=schedule_id,
+                    desired_position_id=desired_position_id
+                ))
+    
+    return employment_id, schedule_id
+
+
+async def _process_skills(db: SqlAlchemySession, skills: List[str], resume_id: int) -> None:
+    '''Создание и наполнение CandidateSkills модели'''
+    for skill in skills:
+        skill_id = await _create_or_match_skill(skill)
+        if skill_id:
+            db.add(CandidateSkill(
+                resume_id=resume_id,
+                skill_id=skill_id,
+                proficiency='НАЧАЛЬНЫЙ'
+            ))
+
+
+def _process_experiences(db: SqlAlchemySession, experiences: List[Any], resume_id: int) -> None:
+    '''Создание и наполнение WorkExperience модели'''
+    work_experiences = [
+        WorkExperience(
+            resume_id=resume_id,
+            company=exp.company,
+            position=exp.position,
+            description=exp.description,
+            start_date=_parse_ym_date(exp.period[0]),
+            end_date=_parse_ym_date(exp.period[1])
+        )
+        for exp in experiences
+    ]
+    db.add_all(work_experiences)
+
+
+async def _create_or_match_skill(skill: Optional[str]) -> Optional[int]:
+    '''Найти существующий Skill в базе данных или создать новый вид'''
     if not skill:
-        return
+        return None
     
     try:
         with Session() as db:
-            skill_entry = db.query(Skill).filter(
-                Skill.skill_name == skill
-            ).first()
+            skill_entry = db.query(Skill).filter(Skill.skill_name == skill).first()
             
             if skill_entry:
                 return skill_entry.id
             
             new_skill = Skill(skill_name=skill)
-            
             db.add(new_skill)
             db.flush()
-            db.commit()
-            
             return new_skill.id
         
     except Exception as e:
         logger.error(f'Error in _create_or_match_skill: {e}')
-        return
-    
-    
+        return None
+
+
 def _parse_ym_date(ym_str: Optional[str]) -> Optional[date]:
     '''Сконвертировать 'YYYY-MM' строку в date объект (устанавливается первый день месяца)'''
-    if ym_str:
-        converted_date = datetime.strptime(ym_str + "-01", "%Y-%m-%d").date()
-        return converted_date
-    return None
+    if not ym_str:
+        return None
+    return datetime.strptime(ym_str + "-01", "%Y-%m-%d").date()
