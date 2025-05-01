@@ -1,10 +1,10 @@
 import logging
 import src.gigachat_module.utils.prompts as prompts
 
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 
 from .client import get_gigachat_client
-from langchain_core.messages import SystemMessage, HumanMessage, merge_message_runs
+from langchain_core.messages import SystemMessage, HumanMessage
 from src.gigachat_module.parser import ResumeData
 
 
