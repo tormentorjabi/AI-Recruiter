@@ -19,17 +19,21 @@ from src.gigachat_module.parser import ResumeData
 logger = logging.getLogger(__name__)
 
 
-async def create_candidates_entries(resumes: List[Optional[ResumeData]]) -> None:
+async def create_candidates_entries(resumes: List[Optional[ResumeData]]) -> Optional[List[int]]:
     '''Создать записи в базе данных для списка кандидатов, по данным с резюме'''
     try:
+        ids = []
         with Session() as db:
             for resume_data in filter(None, resumes):
-                await _process_single_resume(db, resume_data)
+                resume_id = await _process_single_resume(db, resume_data)
+                if resume_id:
+                    ids.append(resume_id)
+            return ids
     except Exception as e:
         logger.error(f'Error in create_candidate_entry: {str(e)}')
 
 
-async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData) -> None:
+async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData) -> int:
     '''Процессинг единичного резюме с созданием всех необходимых моделей'''
     candidate = _create_candidate(db, resume_data)
     application = _create_application(db, resume_data, candidate.id)
@@ -40,6 +44,8 @@ async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData)
     resume = await _create_resume(db, resume_data, candidate.id, application.id)
     if not resume:
         return
+    
+    resume_id = resume.id
     
     desired_position_id = None
     if resume_data.position and resume_data.salary:
@@ -58,6 +64,7 @@ async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData)
         _process_experiences(db, resume_data.experiences, resume.id)
     
     db.commit()
+    return resume_id
 
 
 def _create_candidate(db: SqlAlchemySession, resume_data: ResumeData) -> Candidate:
