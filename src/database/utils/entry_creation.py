@@ -112,7 +112,6 @@ async def _create_resume(db: SqlAlchemySession, resume_data: ResumeData, candida
         resume_entry = db.query(Resume).filter_by(
             resume_link=resume_data.link
         ).first()
-        logger.error(f'ENTRY check: {resume_entry.application.vacancy.id == resume_data.vacancy_id}')
         if resume_entry and resume_entry.application.vacancy.id == resume_data.vacancy_id:
             return
     except Exception as e:
