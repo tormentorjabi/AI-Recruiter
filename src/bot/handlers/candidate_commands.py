@@ -788,7 +788,7 @@ async def handle_proceed_to_llm(
     # Инициализируем скрининг с Telegam бота
     tg_screening = TelegramScreening()
     # Отправляем ответы кандидата на оценку в GigaChat
-    telegram_screening_score = await tg_screening.conduct_additional_screening(answers)
+    telegram_screening_score = await tg_screening.screen_answers(answers)
     try:
         analysis_score = int(telegram_screening_score)
     except (ValueError, TypeError):
@@ -803,7 +803,7 @@ async def handle_proceed_to_llm(
                 gigachat_score=telegram_screening_score,
                 # TODO:
                 # - Решение должно зависеть от оценки GigaChat
-                final_decision="approve" if analysis_score > 8 else "reject",
+                final_decision="В РАЗРАБОТКЕ" if analysis_score > 8 else "В РАЗРАБОТКЕ",
                 processed_at=datetime.now(timezone.utc)
             )
             db.add(analysis_result)
@@ -819,7 +819,7 @@ async def handle_proceed_to_llm(
                 analysis_score=analysis_score,
                 final_decision=decision,           
                 status="new",
-                sent_at=datetime.utcnow()
+                sent_at=datetime.now(timezone.utc)
             )
             db.add(notification)
             

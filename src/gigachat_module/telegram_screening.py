@@ -1,12 +1,20 @@
-import json
 import logging
+import src.gigachat_module.utils.prompts as prompts
 
-from .client import get_gigachat_client
+from typing import List
 from langchain_core.messages import SystemMessage, HumanMessage
 
+from .client import get_gigachat_client
 from src.gigachat_module.utils.formatters import candidate_answers_formatter
 
 logger = logging.getLogger(__name__)
+
+# Ключи для поиска вопросов должны строго совпадать с вопросами по вакансии.
+# Данные для этих ключей взяты из списка текущих вопросов по вакансии из: tests/bot_questions_data.py: QUESTION_DATA
+CUSTOMER_FOCUS_QUESTION_KEY = 'Если ответили "Да" на предыдущий вопрос: по каким признакам вы считаете себя клиентоориентированным? Приведите пример ситуации, когда вы проявили клиентоориентированность'
+SOFTWARE_QUESTION_KEY = 'Какими офисными программами вы владеете?'
+STRESS_QUESTION_KEY_PREFIX = 'Согласны ли вы, что работа в контактном центре может быть стрессовой?'
+STRESS_QUESTION_KEY = 'Почему вы так считаете?'
 
 
 class TelegramScreening:
@@ -48,51 +56,70 @@ class TelegramScreening:
             criteria_text += f"- {key.replace('_', ' ').title()}: {value}\n"
         return criteria_text
     
+    def _collect_tasks(self, candidate_responses_json: str) -> List[HumanMessage]:
+        tasks = []
+        focus_key = [CUSTOMER_FOCUS_QUESTION_KEY]
+        software_key = [SOFTWARE_QUESTION_KEY]
+        stress_key = [STRESS_QUESTION_KEY_PREFIX, STRESS_QUESTION_KEY]
+
+        try:
+            focus_answer = candidate_answers_formatter(candidate_responses_json, focus_key)
+            if focus_answer:
+                tasks.append(HumanMessage(content=focus_answer))
+            
+            software_answer = candidate_answers_formatter(candidate_responses_json, software_key)
+            if software_answer:
+                tasks.append(HumanMessage(content=software_answer))
+            
+            stress_answer = candidate_answers_formatter(candidate_responses_json, stress_key)
+            if stress_answer:
+                tasks.append(HumanMessage(content=stress_answer))
+
+            return tasks
+        except Exception as e:
+            logger.error(f'Failed to create tasks from candidate responses: {candidate_responses_json}. Error: {str(e)}')  
+            return []
     
-    async def conduct_additional_screening(self, candidate_responses, screening_criterias=None) -> str:
+    async def screen_answers(
+        self, 
+        candidate_responses_json: str, 
+        screening_criterias: str = None
+    ) -> str:
         """
         Провести дополнительную оценку кандидата по его ответам из Telegram бота
         
         Args:
-            candidate_responses: Обобщенные ответы кандидата
-            screening_criterias: Требования для скрининга
+            candidate_responses (str): Обобщенные ответы кандидата в JSON формате
+            screening_criterias (str): Требования для скрининга
             
         Returns:
             str: Финальная оценка от GigaChat по кандидату
         """
-        criteria_text = self._format_criteria(screening_criterias) if screening_criterias else ""
-        # system_message = SystemMessage(content=f"""
-        # Я отправляю тебе ответы по кандидату и хочу проверить, правильно ли ты их видишь.
-
-        # Ответы придут тебе в формате:
-        #     Q: Вопрос
-        #     A: Ответ
+        # criteria_text = self._format_criteria(screening_criterias) if screening_criterias else ""
         
-        #     Q: Вопрос2
-        #     A: Ответ2
-        #     ...
-        #     и так далее
-            
-        # Просмотри их и скажи мне:
-        # Какой ответ был у последнего вопроса?
-        # """)
+        # Общая оценка
+        global_score = 0
         
-        system_message = SystemMessage(content=f"""
-        Я отправляю тебе ответы кандидатов. Поставь оценку случайным образом от [1, 10]
-        Ограничивайся двумя знаками после запятой.
-        В ответе присылай просто оценку в формате: 'X', например '5'        
-        """)
-        responses_text = candidate_answers_formatter(candidate_responses)
-        
-        messages = [
-            system_message,
-            HumanMessage(content=responses_text)
-        ]
+        # Глобальный системный промпт
+        system_message = SystemMessage(content=prompts.TELEGRAM_SYSTEM_MESSAGE)
         
         try:
-            response = self.giga.invoke(messages)
-            return response.content
+            tasks = self._collect_tasks(candidate_responses_json)
+            
+            for task_message in tasks:
+                messages = [
+                    system_message,
+                    task_message
+                ]
+                response = await self.giga.ainvoke(messages)
+                task_score = response.content
+                
+                try:
+                    global_score += int(task_score)
+                except (ValueError, TypeError):
+                    pass
+            return global_score
         
         except Exception as e:
-            logger.error(f'Error occured in Telegram Screening: {str(e)}')
-            raise
+            logger.error(f'Failed to invoke telegram tasks: {tasks}. Error: {str(e)}')
+            return global_score
