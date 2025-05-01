@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from aiogram.utils.markdown import bold
 
 def escape_markdown(text: str) -> str:
@@ -213,7 +213,8 @@ def work_mode_changed_message(
 def detail_text_message(
     candidate_name: str,
     vacancy_title: str,
-    score: int,
+    resume_score: Union[int, str],
+    telegram_score: int,
     decision: str,
     date,
     status: str,
@@ -225,7 +226,9 @@ def detail_text_message(
     return (
             f"👤 Кандидат: {escape_markdown(candidate_name)}\n\n"
             f"📌 Вакансия: {escape_markdown(vacancy_title)}\n\n"
-            f"⭐ Оценка GigaChat: *{escape_markdown(score)}*\n\n"
+            f"🤖 Анализ GigaChat:\n"
+            f"📄 Оценка резюме: *{escape_markdown(resume_score)}*\n"
+            f"⭐ Оценка ответов в Telegram: *{escape_markdown(telegram_score)}*\n\n"
             f"⚙️ Решение GigaChat: {bold(escape_markdown(decision))}\n\n"
             f"📅 Оценка получена: {escape_markdown(date)}\n\n"
             f"🔄 Статус по обработке от HR: {bold(escape_markdown(status))}\n\n"

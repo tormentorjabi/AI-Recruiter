@@ -104,14 +104,26 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
     # 2. Новые (отсортированы по уменьшению оценки GigaChat)
     # 3. Одобренные (отсортированы по уменьшению оценки GigaChat)
     # 4. Отказанные (отсортированы по уменьшению оценки GigaChat)
+    
+    with Session() as db:
+        resume_scores = {
+            r.application_id: r.gigachat_score 
+            for r in db.query(Resume).filter(
+                Resume.application_id.in_(
+                    [n.application_id for n in notifications if n.application_id]
+                )
+            ).all()
+        }
+    
     sorted_notifications = sorted(
         notifications,
         key=lambda x: (
             {"processing": 0, "new": 1, "approved": 2, "declined": 3}.get(x.status, 4),
-            -x.analysis_score if x.analysis_score else 0
-        )
+            # Объединенная оценка по резюме + по ответам
+            -((x.analysis_score or 0) * 1 + (resume_scores.get(x.application_id, 0) * 1))
+            )
     )
-    
+
     total_pages = (len(sorted_notifications) + items_per_page - 1) // items_per_page
     page_notifications = sorted_notifications[page*items_per_page:(page+1)*items_per_page]
     
@@ -119,10 +131,11 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
     with Session() as db:
         for notification in page_notifications:
             vacancy = db.query(Vacancy).get(notification.vacancy_id)
+            resume_score = resume_scores.get(notification.application_id, 0)
             vacancy_title = vacancy.title
             btn_text = (
                 f"{vacancy_title[:15]} | "
-                f"Оценка: {notification.analysis_score} | "
+                f"Оценка: {notification.analysis_score + resume_score} | "
                 f"{get_status_display(notification.status)}"
             )
             keyboard.append([
@@ -275,10 +288,15 @@ async def _show_notification_detail(callback: CallbackQuery):
                 hr = notification.application.hr_specialist
                 hr_name = hr.full_name
 
+            resume_score: int = None
+            resume = notification.application.resume
+            resume_score = resume.gigachat_score
+            
             detail_text = msg_templates.detail_text_message(
                 candidate_name=candidate_name,
                 vacancy_title=vacancy_title,
-                score=notification.analysis_score,
+                resume_score=resume_score if resume_score else 'оценка ещё не проводилась',
+                telegram_score=notification.analysis_score,
                 decision=get_status_display(notification.final_decision)[2:],
                 date=notification.sent_at.strftime('%Y-%m-%d'),
                 status=get_status_display(notification.status)[2:],

@@ -29,7 +29,7 @@ class Resume(Base):
     
     id = Column(Integer, primary_key=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
-    application_id = Column(Integer, ForeignKey('applications.id'))
+    application_id = Column(Integer, ForeignKey('applications.id'), unique=True)
     resume_link = Column(Text)
     # UPD 01.05.2025:
     # - Предложение более неактуально, поле не используется. 

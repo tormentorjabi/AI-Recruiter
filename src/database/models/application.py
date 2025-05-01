@@ -44,7 +44,7 @@ class Application(Base):
     candidate = relationship("Candidate", back_populates="applications")
     vacancy = relationship("Vacancy", back_populates="applications")
     hr_specialist = relationship("HrSpecialist", back_populates="applications")
-    resume = relationship("Resume", back_populates="application")
+    resume = relationship("Resume", back_populates="application", uselist=False)
     analysis_results = relationship("AnalysisResult", back_populates="application")
     interaction = relationship("BotInteraction", back_populates="application")
     notification = relationship("HrNotification", back_populates="application")

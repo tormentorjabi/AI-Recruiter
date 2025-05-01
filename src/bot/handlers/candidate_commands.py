@@ -803,7 +803,7 @@ async def handle_proceed_to_llm(
                 gigachat_score=telegram_screening_score,
                 # TODO:
                 # - Решение должно зависеть от оценки GigaChat
-                final_decision="В РАЗРАБОТКЕ" if analysis_score > 8 else "В РАЗРАБОТКЕ",
+                final_decision="approve" if analysis_score > 30 else "reject",
                 processed_at=datetime.now(timezone.utc)
             )
             db.add(analysis_result)
