@@ -33,10 +33,13 @@ async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData)
     '''Процессинг единичного резюме с созданием всех необходимых моделей'''
     candidate = _create_candidate(db, resume_data)
     application = _create_application(db, resume_data, candidate.id)
+    # TODO: Переделать
     t = _handle_application_token(db, application.id)
     logger.warning(f'Готовый для отправки кандидату - {candidate.full_name} токен: {t}')
     
-    resume = _create_resume(db, resume_data, candidate.id, application.id)
+    resume = await _create_resume(db, resume_data, candidate.id, application.id)
+    if not resume:
+        return
     
     desired_position_id = None
     if resume_data.position and resume_data.salary:
@@ -103,8 +106,18 @@ def _handle_application_token(db: SqlAlchemySession, application_id: int) -> Non
     return generated_token
 
 
-def _create_resume(db: SqlAlchemySession, resume_data: ResumeData, candidate_id: int, application_id: int) -> Resume:
+async def _create_resume(db: SqlAlchemySession, resume_data: ResumeData, candidate_id: int, application_id: int) -> Resume:
     '''Создание и наполнение Resume модели'''
+    try:
+        resume_entry = db.query(Resume).filter_by(
+            resume_link=resume_data.link
+        ).first()
+        logger.error(f'ENTRY check: {resume_entry.application.vacancy.id == resume_data.vacancy_id}')
+        if resume_entry and resume_entry.application.vacancy.id == resume_data.vacancy_id:
+            return
+    except Exception as e:
+        logger.error(f'Error while trying to find duplicate resume: {str(e)}')
+    
     now = datetime.now(timezone.utc)
     resume = Resume(
         candidate_id=candidate_id,
