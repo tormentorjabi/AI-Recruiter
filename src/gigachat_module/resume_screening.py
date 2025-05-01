@@ -100,8 +100,11 @@ class ResumeScreening:
                             f'{employment_summary}\n'            
                     )
                 ))
+            
+            return tasks
         except Exception as e:
             logger.error(f'Failed to create tasks from ResumeData: {resume_data}. Error: {str(e)}')  
+            return []
     
     async def screen_resume(self, resume_data: ResumeData, job_requirements: str = None) -> int:
         """
