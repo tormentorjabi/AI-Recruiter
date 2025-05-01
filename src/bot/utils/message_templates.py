@@ -213,7 +213,7 @@ def work_mode_changed_message(
 def detail_text_message(
     candidate_name: str,
     vacancy_title: str,
-    score: float,
+    score: int,
     decision: str,
     date,
     status: str,

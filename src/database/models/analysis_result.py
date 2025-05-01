@@ -5,20 +5,18 @@ from sqlalchemy import (
     String,
     DateTime
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
 class AnalysisResult(Base):
     """
-    Модель результата анализа кандидата
+    Модель результатов скрининга GigaChat ответов кандидата в Telegram
     
     Fields:
         candidate_id (int): FK на соискателя по вакансии
         application_id (int): FK на отклик
-        summary (JSONB): Результат анализа от GigaChat
-        source (str): Источник оценки (по резюме / по ответам в Telegram)
+        gigachat_score (int): Результат анализа от GigaChat
         final_decision (str): Решение по кандидату ('approve' / 'rejected' / 'need_more_info')
         processed_at (datetime): Время обработки запроса
     """
@@ -27,8 +25,7 @@ class AnalysisResult(Base):
     id = Column(Integer, primary_key=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
     application_id = Column(Integer, ForeignKey('applications.id'))
-    summary = Column(JSONB)
-    source = Column(String(20))
+    gigachat_score = Column(Integer)
     final_decision = Column(String(20))
     processed_at = Column(DateTime)
     

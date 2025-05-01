@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from src.bot.core.bot import bot, dp
 from src.bot.utils.check_abandoned_forms import check_abandoned_forms
-from src.application_processing_tasks import resume_processing_task
+from src.application_processing_tasks import resumes_processing_task
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -40,13 +40,13 @@ async def main() -> None:
                 - check_abandoned_forms: проверка брошенных анкет и отправка напоминаний.
                 - direct_prompts_to_gigachat: прямое общение с моделью GigaChat [DEV MODE ONLY]
         ''' 
-        resume_processing = asyncio.create_task(resume_processing_task(delay_hours=24))
+        resumes_processing = asyncio.create_task(resumes_processing_task(delay_hours=24))
         set_bot_commands = asyncio.create_task(bot.set_my_commands(commands=commands))
         bot_task = asyncio.create_task(dp.start_polling(bot))
         abandoned_forms_checks = asyncio.create_task(check_abandoned_forms(bot=bot, delay_minutes=30))
 
         await asyncio.gather(
-            resume_processing,
+            resumes_processing,
             set_bot_commands,
             bot_task,
             abandoned_forms_checks,

@@ -7,12 +7,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy import and_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.database.session import Session
 from src.database.models import (
     Candidate, Application, BotQuestion, HrNotification,
-    Vacancy, BotInteraction, HrSpecialist, AnalysisResult
+    Vacancy, BotInteraction, AnalysisResult
 )
 
 from src.bot.utils.bot_answers_json_builder import build_json
@@ -788,11 +788,11 @@ async def handle_proceed_to_llm(
     # Инициализируем скрининг с Telegam бота
     tg_screening = TelegramScreening()
     # Отправляем ответы кандидата на оценку в GigaChat
-    analysis = await tg_screening.conduct_additional_screening(answers)
+    telegram_screening_score = await tg_screening.conduct_additional_screening(answers)
     try:
-        analysis_score = float(analysis)
-    except ValueError:
-        analysis_score = 0
+        analysis_score = int(telegram_screening_score)
+    except (ValueError, TypeError):
+        telegram_screening_score = 0
         
     try:
         with Session() as db:
@@ -800,12 +800,11 @@ async def handle_proceed_to_llm(
             analysis_result = AnalysisResult(
                 candidate_id=candidate_id,
                 application_id=application_id,
-                summary={"Оценка: ": analysis},
-                source="telegram",
+                gigachat_score=telegram_screening_score,
                 # TODO:
                 # - Решение должно зависеть от оценки GigaChat
-                final_decision="approve" if analysis_score > 0.8 else "reject",
-                processed_at=datetime.utcnow()
+                final_decision="approve" if analysis_score > 8 else "reject",
+                processed_at=datetime.now(timezone.utc)
             )
             db.add(analysis_result)
             db.flush()
@@ -817,7 +816,6 @@ async def handle_proceed_to_llm(
                 candidate_id=candidate_id,
                 application_id=application_id,
                 vacancy_id=vacancy_id,
-                channel='telegram',
                 analysis_score=analysis_score,
                 final_decision=decision,           
                 status="new",

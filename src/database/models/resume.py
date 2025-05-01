@@ -6,10 +6,9 @@ from sqlalchemy import (
     Text, 
     DateTime
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from src.database.session import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Resume(Base):
@@ -21,7 +20,7 @@ class Resume(Base):
         application_id (int): FK на отклик
         resume_link (text): Ссылка на резюме на HH.ru
         parsed_text (text): Подготовленные и обобщённые данные резюме, для его отправки в GigaChat
-        gigachat_response (JSONB): Последний результат GigaChat по резюме
+        gigachat_score (int): Результат оценки GigaChat по резюме
         analysis_status (str): Текущий статус обработки резюме
         created_at (datetime): Время создания записи
         updated_at (datetime): Время обновления записи
@@ -32,15 +31,21 @@ class Resume(Base):
     candidate_id = Column(Integer, ForeignKey('candidates.id'))
     application_id = Column(Integer, ForeignKey('applications.id'))
     resume_link = Column(Text)
-    # В процессе подготовки обработки резюме GigaChat'ом, скорее всего, мы будем
-    # конструировать разные данные о кандидате (данные с разных записей в БД)
-    # по типу: "Имя+Возраст+Город+Желаемая_зарплата" и т.д.
-    # Эту итоговую строку я предлагаю сохранять здесь.
-    # Открыто для обсуждения.
-    parsed_text = Column(Text)
-    gigachat_response = Column(JSONB)
+    # UPD 01.05.2025:
+    # - Предложение более неактуально, поле не используется. 
+    #   Удалено.
+    #
+    # MSG 31.03.2025:
+    # - В процессе подготовки обработки резюме GigaChat'ом, скорее всего, мы будем
+    #   конструировать разные данные о кандидате (данные с разных записей в БД)
+    #   по типу: "Имя+Возраст+Город+Желаемая_зарплата" и т.д.
+    #   Эту итоговую строку я предлагаю сохранять здесь.
+    #   Открыто для обсуждения.
+    #
+    # parsed_text = Column(Text)
+    gigachat_score = Column(Integer)
     analysis_status = Column(String(20), server_default='pending')
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime)
     
     candidate = relationship("Candidate", back_populates="resumes")

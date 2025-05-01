@@ -29,7 +29,7 @@ class HrNotification(Base):
         vacancy_id (int): FK на вакансию
         application_id (int): FK на отклик
         channel (str): Канал связи с HR-специалистом
-        analysis_score (float): Оценка GigaChat
+        analysis_score (int): Оценка GigaChat по ответам с Telegram
         final_decision (str): Решение по отклику от GigaChat (approve/reject)
         sent_at (datetime): Время отправления сообщения
         status (str): Статус отработки по кандидату HR'ом
@@ -42,7 +42,7 @@ class HrNotification(Base):
     vacancy_id = Column(Integer, ForeignKey('vacancies.id'))
     application_id = Column(Integer, ForeignKey('applications.id'))
     channel = Column(String(20), server_default='telegram')
-    analysis_score = Column(Float)
+    analysis_score = Column(Integer)
     final_decision = Column(String(20))
     sent_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String(20), server_default='new')

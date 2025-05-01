@@ -122,7 +122,7 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
             vacancy_title = vacancy.title
             btn_text = (
                 f"{vacancy_title[:15]} | "
-                f"Оценка: {notification.analysis_score:.2f} | "
+                f"Оценка: {notification.analysis_score} | "
                 f"{get_status_display(notification.status)}"
             )
             keyboard.append([
