@@ -6,10 +6,7 @@ from dotenv import load_dotenv
 
 from src.bot.core.bot import bot, dp
 from src.bot.utils.check_abandoned_forms import check_abandoned_forms
-from src.gigachat_module.parser import parse_multiple_resumes
-from src.gigachat_module.utils.resume_processing import resume_processing_task
-# [DEV MODE ONLY]
-# from src.gigachat_module.custom_llm_task import custom_llm_task_loop
+from src.application_processing_tasks import resume_processing_task
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -26,14 +23,13 @@ async def main() -> None:
             BotCommand(command='/cancel', description='Отменить процесс заполнение анкеты (для соискателя по вакансии)'),
             BotCommand(command='/register_hr', description='Регистрация (для HR-специалиста)'),
             BotCommand(command='/get_reviews', description='Посмотреть решения по кандидатам (для HR-специалиста)'),
-            # BotCommand(command='/change_work_mode', description='Сменить режим работы (для HR-специалиста)'),
             BotCommand(command='/generate_token', description='Генерация токена регистрации (для Админа)'),
             BotCommand(command='/delete_hr', description='Удаление HR-специалиста (для Админа)'),
             BotCommand(command='/list_hr', description='Список зарегистрированых HR-специалистов (для Админа)'),
              # [DEV MODE ONLY] commands
             BotCommand(command='/clr_db', description='Очистить БД (DEV MODE ONLY)'),
-            BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
-            BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
+            # BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
+            # BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
         ]
         
         '''
@@ -48,16 +44,12 @@ async def main() -> None:
         set_bot_commands = asyncio.create_task(bot.set_my_commands(commands=commands))
         bot_task = asyncio.create_task(dp.start_polling(bot))
         abandoned_forms_checks = asyncio.create_task(check_abandoned_forms(bot=bot, delay_minutes=30))
-        # [DEV MODE ONLY]
-        # direct_prompts_to_gigachat = asyncio.create_task(custom_llm_task_loop()) 
 
         await asyncio.gather(
             resume_processing,
             set_bot_commands,
             bot_task,
             abandoned_forms_checks,
-            # [DEV MODE ONLY]
-            # direct_prompts_to_gigachat
         )
     except Exception as e:
         logger.error(f'Error occured: {e}', exc_info=True)
