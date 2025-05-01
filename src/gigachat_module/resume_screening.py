@@ -122,10 +122,7 @@ class ResumeScreening:
         global_score = 0
         
         # Глобальный системный промпт
-        system_message = SystemMessage(content=f"""
-        Оцени часть резюме и поставь одну итоговую оценку в соответствии с приведёнными правилами. 
-        Строго следи за своей оценкой, в твоем ответе всегда должен быть только один ответ: целое число баллов    
-        """)
+        system_message = SystemMessage(content=prompts.RESUME_SYSTEM_MESSAGE)
         
         try:
             age_score, salary_score = self._calculate_intermediate_values(resume_data=resume_data)
