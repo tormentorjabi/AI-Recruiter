@@ -47,7 +47,7 @@ async def truncate_database(message: Message):
             
             query = (
             "TRUNCATE applications, candidates, vacancies, "
-            "bot_questions, bot_interactions, hr_notifications, hr_specialists CASCADE"
+            "bot_questions, bot_interactions, hr_notifications, hr_specialists, resumes CASCADE"
             )
             
             db.execute(text(query))
