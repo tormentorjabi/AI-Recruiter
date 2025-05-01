@@ -1,6 +1,6 @@
 import logging
 import src.bot.utils.message_templates as msg_templates
-from src.gigachat_module.telegram_screening import TelegramScreening
+from src.gigachat_module.utils.formatters import candidate_answers_formatter
 
 from aiogram import Bot
 from aiogram import Router, F
@@ -342,10 +342,7 @@ async def _get_candidate_answers(callback: CallbackQuery):
                 vacancy_id=notification.vacancy_id
             )
             
-            # TelegramScreening.format_responses предоставляет удобный
-            # способ представления JSON ответов кандидата для чтения человеком.
-            # Сам скрининг больше ни для чего здесь не нужен.
-            formatted_answers = TelegramScreening.format_responses(
+            formatted_answers = candidate_answers_formatter(
                 answers_json
             )
             
