@@ -10,11 +10,14 @@ from .application import Application
 from .analysis_result import AnalysisResult
 from .hr_notification import HrNotification
 from .bot_interaction import BotInteraction
-from .candidate_answer import CandidateAnswer
 from .bot_question import BotQuestion
 from .desired_position_employment import DesiredPositionEmployment
 from .desired_position_schedule import DesiredPositionSchedule
 from .candidate_skill import CandidateSkill
+from .hr_specialist import HrSpecialist
+from .registration_token import RegistrationToken
+from .vacancy import Vacancy
+# from .candidate_answer import CandidateAnswer
 
 
 __all__ = [
@@ -30,9 +33,13 @@ __all__ = [
     "AnalysisResult",
     "HrNotification",
     "BotInteraction",
-    "CandidateAnswer",
+    # Removal's reason: described in CandidateAnswer.py file
+    # "CandidateAnswer",
     "BotQuestion",
     "DesiredPositionEmployment",
     "DesiredPositionSchedule",
     "CandidateSkill",
+    "HrSpecialist",
+    "RegistrationToken",
+    "Vacancy",
 ]

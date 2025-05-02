@@ -1,8 +1,9 @@
 from sqlalchemy import (
     Column,
     Integer, 
-    String
+    Text
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -17,10 +18,12 @@ class WorkSchedule(Base):
             'Гибкий график',
             'Удаленная работа',
             'Вахтовый метод'
-        )
+            )
     """
     __tablename__ = 'work_schedules'
     
     id = Column(Integer, primary_key=True)
-    schedule = Column(String(50))
+    schedule = Column(Text)
+    
+    desired_positions = relationship("DesiredPositionSchedule", back_populates="schedule")
     

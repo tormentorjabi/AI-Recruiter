@@ -4,6 +4,7 @@ from sqlalchemy import (
     Integer, 
     String
 )
+from sqlalchemy.orm import relationship
 from src.database.session import Base
 
 
@@ -22,4 +23,7 @@ class CandidateSkill(Base):
     resume_id = Column(Integer, ForeignKey('resumes.id'))
     skill_id = Column(Integer, ForeignKey('skills.id'))
     proficiency = Column(String(30))
+    
+    resume = relationship("Resume", back_populates="skills")
+    skill = relationship("Skill", back_populates="candidate_skills")
     

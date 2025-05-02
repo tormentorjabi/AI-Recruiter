@@ -1,42 +1,65 @@
-import os
+import asyncio
+import logging
 
+from aiogram.types import BotCommand
 from dotenv import load_dotenv
-from gigachat_module.client import get_gigachat_client
-from langchain_core.messages import HumanMessage, SystemMessage
 
+from src.bot.core.bot import bot, dp
+from src.bot.utils.check_abandoned_forms import check_abandoned_forms
+from src.application_processing_tasks import resumes_processing_task
+
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 
-def custom_llm_task(prompt: str) -> str:
-    """
-    Прямое общение с GigaChat, предполагается только для этапа разработки
-    
-    Args:
-        prompt (str): Промпт для отправки в модель
-        
-    Returns:
-        str: Ответ GigaChat
-    """
+async def main() -> None:
     try:
-        giga = get_gigachat_client()
-        
-        messages = [
-            HumanMessage(content=prompt)
+        commands = [
+            # Production commands
+            BotCommand(command='/start', description='Запуск бота'),
+            BotCommand(command='/cancel', description='Отменить процесс заполнение анкеты (для соискателя по вакансии)'),
+            BotCommand(command='/register_hr', description='Регистрация (для HR-специалиста)'),
+            BotCommand(command='/get_reviews', description='Посмотреть решения по кандидатам (для HR-специалиста)'),
+            BotCommand(command='/generate_token', description='Генерация токена регистрации (для Админа)'),
+            BotCommand(command='/delete_hr', description='Удаление HR-специалиста (для Админа)'),
+            BotCommand(command='/list_hr', description='Список зарегистрированых HR-специалистов (для Админа)'),
+             # [DEV MODE ONLY] commands
+            BotCommand(command='/clr_db', description='Очистить БД (DEV MODE ONLY)'),
+            # BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
+            # BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
         ]
         
-        response = giga.invoke(messages)
-        return response.content
-    
-    except Exception as e:
-        print(f'Error occured in direct LLM task: {e}')
-        return None
-    
+        '''
+            Сборка основных корутин приложения:
+                - resume_processing: парсинг резюме HH по URL.
+                - set_bot_commands: меню всплывающих команд Telegram бота.
+                - bot_task: основной цикл работы Telegram бота, запуск получения событий.
+                - check_abandoned_forms: проверка брошенных анкет и отправка напоминаний.
+                - direct_prompts_to_gigachat: прямое общение с моделью GigaChat [DEV MODE ONLY]
+        ''' 
+        resumes_processing = asyncio.create_task(resumes_processing_task(delay_hours=24))
+        set_bot_commands = asyncio.create_task(bot.set_my_commands(commands=commands))
+        bot_task = asyncio.create_task(dp.start_polling(bot))
+        abandoned_forms_checks = asyncio.create_task(check_abandoned_forms(bot=bot, delay_minutes=30))
 
-while(True):
-    user_msg = input("ПРОМПТ ПОЛЬЗОВАТЕЛЯ: ")
-    if user_msg == "СТОП":
-        break
-    response = custom_llm_task(user_msg)
-    print(response)
+        await asyncio.gather(
+            resumes_processing,
+            set_bot_commands,
+            bot_task,
+            abandoned_forms_checks,
+        )
+    except Exception as e:
+        logger.error(f'Error occured: {e}', exc_info=True)
+    finally:
+        await bot.session.close()
+        logger.info('Bot session closed.')
     
+if __name__ == "__main__":
+    try:
+        print('Power on...')
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("Turning off...")
