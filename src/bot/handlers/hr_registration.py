@@ -28,7 +28,7 @@ async def start_hr_registration(message: Message, state: FSMContext):
         ).first()
 
         if existing_hr:
-            await message.answer(msg_templates.HR_ALREADY_EXISTS)
+            await message.answer(msg_templates.HR_ALREADY_EXISTS, parse_mode="Markdown")
             return
 
     await message.answer(
@@ -120,7 +120,10 @@ async def process_full_name(message: Message, state: FSMContext):
             db.commit()
             
     except IntegrityError as e:
-        await message.answer(msg_templates.HR_ALREADY_EXISTS)
+        await message.answer(
+            msg_templates.HR_ALREADY_EXISTS, 
+            parse_mode="Markdown"
+        )
         await state.clear()
         return
     
