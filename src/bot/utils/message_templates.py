@@ -133,14 +133,12 @@ def hr_with_id_not_found_message(telegram_id: str) -> str:
 def list_hr_instance_info_message(
     hr_full_name: str,
     hr_telegram_id: str,
-    hr_created_at: str,
-    hr_work_mode: bool
+    hr_created_at: str
 ) -> str:
     return (
         f"• {hr_full_name}\n"
         f"  Telegram ID: `{hr_telegram_id}`\n"
-        f"  Дата регистрации: {hr_created_at}\n"
-        f"  Текущий режим работы: `{"Активен" if hr_work_mode else "Не активен"}`\n\n"
+        f"  Дата регистрации: {hr_created_at}\n\n"
     )
 
 def confirm_delete_hr_message(hr_full_name: str, telegram_id: str) -> str:
@@ -188,26 +186,9 @@ HR_DELETE_CANCELLED = (
 #-----------------
 # Constants used in hr_commands.py
 #-----------------
-def confirm_change_work_mode_message(work_mode: bool) -> str:
-    return (
-        "Режим получения уведомлений:\n"
-        f"{'✅ Активен' if work_mode else '❌ Не активен'}\n\n"
-        "Хотите сменить режим?\n"
-        "Введите [Да/Нет] для подтверждения:"
-    )
-
 def link_to_candidate_resume_message(link: str) -> str:
     return (
         f"[{escape_markdown("Ссылка на резюме кандидата на HH.ru")}]({link})"
-    )
-
-def work_mode_changed_message(
-    status_text: str,
-    status: bool
-) -> str:
-    return (
-        f"🆕 Режим работы изменен на: `{status_text}`\n" +
-        f"Уведомления о кандидатах: {'✅ Включены' if status else '❌ Выключены'}"
     )
 
 def detail_text_message(

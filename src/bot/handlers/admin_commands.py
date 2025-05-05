@@ -24,15 +24,6 @@ class DeleteHRStates(StatesGroup):
     F.chat.id == ADMIN_CHANNEL_ID
 )
 async def generate_token(message: Message):
-    # By applying magic_filter F.chat.id == ADMIN_CHANNEL_ID
-    # user outside of admin channel cannot access this command.
-    # Thus, user warning message is not really needed.
-    if message.chat.id != ADMIN_CHANNEL_ID:
-        await message.answer(
-            msg_templates.ACCESS_RESTRICTED,
-        )
-        return
-    
     await message.answer(
         msg_templates.COMMAND_ACCEPTED
     )
@@ -42,12 +33,12 @@ async def generate_token(message: Message):
             telegram_id=str(ADMIN_USER_ID)
         ).first()
         
+        admin_name = message.from_user.full_name
         if not admin:
             admin = HrSpecialist(
                 telegram_id=str(ADMIN_USER_ID),
-                full_name="System Admin",
-                is_approved=True,
-                work_mode=True
+                full_name=admin_name if admin_name else 'Администратор',
+                is_approved=True
             )
             db.add(admin)
             db.commit()
@@ -94,8 +85,7 @@ async def get_hr_list(message: Message):
                 msg_templates.list_hr_instance_info_message(
                     hr_full_name=hr.full_name,
                     hr_telegram_id=hr.telegram_id,
-                    hr_created_at=hr.created_at.strftime('%d.%m.%Y %H:%M'),
-                    hr_work_mode=hr.work_mode
+                    hr_created_at=hr.created_at.strftime('%d.%m.%Y %H:%M')
                 )
             )
         

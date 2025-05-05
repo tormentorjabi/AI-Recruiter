@@ -31,56 +31,6 @@ ACCEPT_DECISION = True
 DECLINE_DECISION = False
 
 
-class ToggleWorkModeStates(StatesGroup):
-    waiting_for_confirmation = State()
-
-
-# --------------------------
-#  Confirmation Handlers
-# --------------------------
-@hr_commands_router.message(
-    StateFilter(ToggleWorkModeStates.waiting_for_confirmation),
-    F.text.casefold().in_({"да", "yes", "д", "y"})
-)
-async def _confirm_change_work_mode(message: Message, state: FSMContext):
-    try:
-        data = await state.get_data()
-        
-        with Session() as db:
-            hr = db.query(HrSpecialist).get(data['hr_id'])
-        
-            if not hr:
-                await message.answer(msg_templates.HR_NOT_FOUND_IN_DATABASE)
-                await state.clear()
-                return
-
-            new_status = not hr.work_mode
-            hr.work_mode = new_status
-            db.commit()
-
-            status_text = "Активен" if new_status else "Не активен"
-            await message.answer(
-            msg_templates.work_mode_changed_message(
-                status_text=status_text,
-                status=new_status
-            ),
-            parse_mode="Markdown"
-            )
-        
-        await state.clear()
-    except Exception as e:
-        logger.error(f"Error in confirm change work mode: {str(e)}")
-        await handle_db_error(message)
-    
-
-@hr_commands_router.message(
-    StateFilter(ToggleWorkModeStates.waiting_for_confirmation)
-)
-async def _cancel_change_work_mode(message: Message, state: FSMContext):
-    await message.answer(msg_templates.WORK_MODE_CHANGE_CANCELLED)
-    await state.clear()
-
-
 # --------------------------
 #  Display Helpers
 # --------------------------
@@ -166,35 +116,6 @@ def _build_notifications_keyboard(notifications, source_menu: str, page: int = 0
 # --------------------------
 #  Init Commands Handlers
 # --------------------------
-@hr_commands_router.message(Command('change_work_mode'))
-async def _toggle_work_mode(
-    message: Message,
-    state: FSMContext
-):
-    try:
-        with Session() as db:
-            hr = db.query(HrSpecialist).filter_by(
-                telegram_id=str(message.from_user.id),
-                is_approved=True
-            ).first()
-
-            if not hr:
-                await message.answer(
-                    msg_templates.NOT_REGISTERED_AS_HR,
-                    parse_mode="Markdown"
-                )
-                return
-            
-            hr_work_mode = hr.work_mode
-            
-            await state.update_data(hr_id=hr.id)
-            await message.answer(
-                    msg_templates.confirm_change_work_mode_message(work_mode=hr_work_mode),
-                )
-            await state.set_state(ToggleWorkModeStates.waiting_for_confirmation)
-    except Exception as e:
-        logger.error(f"Error in change work mode: {str(e)}")
-        await handle_db_error(message) 
 '''
     TODO:
         - /get_archive - показать архив (двойной - approved/declined)
