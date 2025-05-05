@@ -106,6 +106,7 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
     # 4. Отказанные (отсортированы по уменьшению оценки GigaChat)
     
     with Session() as db:
+        # Словарь типа: {application_id: gigachat_score (resume score)}
         resume_scores = {
             r.application_id: r.gigachat_score 
             for r in db.query(Resume).filter(
@@ -117,10 +118,10 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
     
     sorted_notifications = sorted(
         notifications,
-        key=lambda x: (
-            {"processing": 0, "new": 1, "approved": 2, "declined": 3}.get(x.status, 4),
+        key=lambda notif: (
+            {"processing": 0, "new": 1, "approved": 2, "declined": 3}.get(notif.status, 4),
             # Объединенная оценка по резюме + по ответам
-            -((x.analysis_score or 0) * 1 + (resume_scores.get(x.application_id, 0) * 1))
+            -((notif.analysis_score or 0) * 1 + (resume_scores.get(notif.application_id, 0) * 1))
             )
     )
 
@@ -233,6 +234,14 @@ async def _get_reviews(message: Message, user=None):
         logger.error(f'Get reviews error: {str(e)}')
         await handle_db_error(message)
       
+
+'''
+    TODO:
+        - /get_new_reviews - показать только новые решения
+        - /get_in_processing - показать только решения в обработке
+        - /get_archive - показать архив (двойной - approved/declined)
+'''
+
         
 # --------------------------
 #  Display Handlers
