@@ -140,7 +140,7 @@ async def populate_database_and_generate_candidate_token_test(message: Message):
 async def create_notifications(message: Message):
     try:
         args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
-        count = int(args[0].strip())
+        count = int(args[0].strip()) if len(args) > 0 else 1
         with Session() as db:
             await message.answer(
                 "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ БД..."
