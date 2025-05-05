@@ -3,12 +3,11 @@ from sqlalchemy import (
     ForeignKey,
     String,
     Integer, 
-    DateTime,
-    Float
+    DateTime
 )
 from sqlalchemy.orm import relationship
 from src.database.session import Base
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -44,7 +43,7 @@ class HrNotification(Base):
     channel = Column(String(20), server_default='telegram')
     analysis_score = Column(Integer)
     final_decision = Column(String(20))
-    sent_at = Column(DateTime, default=datetime.utcnow)
+    sent_at = Column(DateTime, default=datetime.now(timezone.utc))
     status = Column(String(20), server_default='new')
     
     candidate = relationship("Candidate", back_populates="notifications")
