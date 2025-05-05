@@ -112,6 +112,21 @@ def _build_notifications_keyboard(notifications, source_menu: str, page: int = 0
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
+
+def _get_archive_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text=msg_templates.REVIEW_APPROVED, 
+                callback_data="get_notifications_a_approved")],
+            [InlineKeyboardButton(
+                text=msg_templates.REVIEW_DECLINED, 
+                callback_data="get_notifications_a_declined")],
+            [InlineKeyboardButton(
+                text=msg_templates.BACK_TO_LIST, 
+                callback_data="back_to_main_menu")]
+        ]) 
+    return keyboard
+
    
 # --------------------------
 #  Init Commands Handlers
@@ -122,7 +137,7 @@ def _build_notifications_keyboard(notifications, source_menu: str, page: int = 0
 '''
 @hr_commands_router.message(Command("get_reviews"))
 async def _get_reviews_selection(message: Message, user=None):
-    '''Сформировать меню с выбором нужной категории'''
+    '''Сформировать меню с выбором категории решений'''
     try:
         with Session() as db:
             user_id = user.id if user else message.from_user.id
@@ -154,7 +169,7 @@ async def _get_reviews_selection(message: Message, user=None):
                     callback_data="get_notifications_p")],
                 [InlineKeyboardButton(
                     text=msg_templates.ARCHIVE_REVIEWS_BUTTON, 
-                    callback_data="get_notifications_a")]
+                    callback_data="archive_menu")]
             ])
             
             await message.answer(
@@ -176,6 +191,13 @@ async def _handle_notifications_pagination(callback: CallbackQuery):
         menu_type = parts[2]
         page = int(parts[3])
 
+        if len(parts) > 4:
+            archive_type = parts[4]
+            full_menu_type = f"{menu_type}_{archive_type}"
+        else:
+            archive_type = None
+            full_menu_type = menu_type
+        
         with Session() as db:
             if menu_type == 'n':
                 notifications = db.query(HrNotification).filter(
@@ -186,14 +208,23 @@ async def _handle_notifications_pagination(callback: CallbackQuery):
                     HrNotification.status == 'processing'
                 ).join(Vacancy).all()
             elif menu_type == 'a':
-                notifications = db.query(HrNotification).filter(
-                    HrNotification.status.in_(['approved', 'declined'])
-                ).join(Vacancy).all()
+                if archive_type == 'approved':
+                    notifications = db.query(HrNotification).filter(
+                        HrNotification.status == 'approved'
+                    ).join(Vacancy).all()
+                elif archive_type == 'declined':
+                    notifications = db.query(HrNotification).filter(
+                        HrNotification.status == 'declined'
+                    ).join(Vacancy).all()
+                else:
+                    notifications = db.query(HrNotification).filter(
+                        HrNotification.status.in_(['approved', 'declined'])
+                    ).join(Vacancy).all()
             
             await callback.message.edit_reply_markup(
                 reply_markup=_build_notifications_keyboard(
                     notifications=notifications, 
-                    source_menu=menu_type,
+                    source_menu=full_menu_type,
                     page=page
                 )
             )
@@ -208,7 +239,14 @@ async def _get_notifications_by_status(callback: CallbackQuery):
     '''Фильтрация необходимых решений, в зависимости от выбранного меню'''
     try:
         with Session() as db:
-            menu_type = callback.data.split("_")[-1]
+            parts = callback.data.split("_")
+            menu_type = parts[2]
+            
+            if len(parts) > 3:
+                archive_type = parts[3]
+            else:
+                archive_type = None
+                
             match menu_type:
                 case 'n':
                     text = msg_templates.NEW_REVIEWS
@@ -221,10 +259,21 @@ async def _get_notifications_by_status(callback: CallbackQuery):
                         status='processing'
                         ).join(Vacancy).all()
                 case 'a':
-                    text = msg_templates.ARCHIVE_REVIEWS
-                    notifications = db.query(HrNotification).filter(
-                        HrNotification.status.in_(['approved', 'declined'])
-                    ).join(Vacancy).all()
+                    if archive_type == 'approved':
+                        text = msg_templates.ARCHIVE_APPROVED
+                        notifications = db.query(HrNotification).filter_by(
+                            status='approved'
+                        ).join(Vacancy).all()
+                    elif archive_type == 'declined':
+                        text = msg_templates.ARCHIVE_DECLINED
+                        notifications = db.query(HrNotification).filter_by(
+                            status='declined'
+                        ).join(Vacancy).all()
+                    else:
+                        text = msg_templates.ARCHIVE_REVIEWS
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status.in_(['approved', 'declined'])
+                        ).join(Vacancy).all()
                 case _:
                     await callback.answer("Недопустипый тип меню")
                     return
@@ -232,7 +281,7 @@ async def _get_notifications_by_status(callback: CallbackQuery):
                 text,
                 reply_markup=_build_notifications_keyboard(
                     notifications,
-                    source_menu=menu_type
+                    source_menu=f"{menu_type}_{archive_type}" if archive_type else menu_type
                 )
             )
         await callback.answer()    
@@ -248,7 +297,10 @@ async def _show_notification_detail(callback: CallbackQuery, source_menu: str = 
         if callback.data.startswith("notification_detail_"):
             parts = callback.data.split("_")
             notification_id = int(parts[2])
-            source_menu = parts[3] if len(parts) > 3 else 'n'
+            source_menu = parts[3]
+            
+            if len(parts) > 4 and parts[3] == 'a':
+                source_menu = f"{parts[3]}_{parts[4]}"
         else:
             notification_id = int(callback.data.split("_")[-1])
             source_menu = source_menu or 'p'
@@ -330,6 +382,22 @@ async def _show_notification_detail(callback: CallbackQuery, source_menu: str = 
     except Exception as e:
         logger.error(f'Error in show notifications detail: {str(e)}')
         await handle_db_error(callback.message)
+
+
+@hr_commands_router.callback_query(F.data == "archive_menu")
+async def _show_archive_menu(callback: CallbackQuery):
+    try:
+        keyboard = _get_archive_keyboard()
+        
+        await callback.message.edit_text(
+            msg_templates.ARCHIVE_TYPE_CHOOSE,
+            reply_markup=keyboard
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f'Error showing archive menu: {str(e)}')
+        await handle_db_error(callback.message) 
+
 
 
 @hr_commands_router.callback_query(F.data.startswith("get_answers_"))
@@ -515,10 +583,29 @@ async def _notify_candidate(
 # --------------------------
 #  Other Handlers
 # --------------------------
+@hr_commands_router.callback_query(F.data == "back_to_main_menu")
+async def _back_to_main_menu(callback: CallbackQuery):
+    try:
+        await _get_reviews_selection(callback.message, user=callback.from_user)
+        await callback.answer()
+    except Exception as e:
+        logger.error(f'Error returning to main menu: {str(e)}')
+        await handle_db_error(callback.message)
+        
+
 @hr_commands_router.callback_query(F.data.startswith("back_to_list_"))
 async def _back_to_list(callback: CallbackQuery):
-    try:    
-        menu_type = callback.data.split("_")[-1]
+    try:
+        parts = callback.data.split("_")
+        menu_type = parts[3]
+
+        if len(parts) > 4:
+            archive_type = parts[4]
+            full_menu_type = f"{menu_type}_{archive_type}"
+        else:
+            archive_type = None
+            full_menu_type = menu_type
+        
         with Session() as db:
             match menu_type:
                 case 'n':
@@ -532,16 +619,31 @@ async def _back_to_list(callback: CallbackQuery):
                     ).join(Vacancy).all()
                     text = msg_templates.PROCESSING_REVIEWS
                 case 'a':
-                    notifications = db.query(HrNotification).filter(
-                        HrNotification.status.in_(['approved', 'declined'])
-                    ).join(Vacancy).all()
-                    text = msg_templates.ARCHIVE_REVIEWS
+                    if archive_type == 'approved':
+                        text = msg_templates.ARCHIVE_APPROVED
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status == 'approved'
+                        ).join(Vacancy).all()
+                    elif archive_type == 'declined':
+                        text = msg_templates.ARCHIVE_DECLINED
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status == 'declined'
+                        ).join(Vacancy).all()
+                    else:
+                        text = msg_templates.ARCHIVE_REVIEWS
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status.in_(['approved', 'declined'])
+                        ).join(Vacancy).all()
                 case _:
                     await callback.answer("Invalid menu type")
                     return
+            
             await callback.message.edit_text(
                 text,
-                reply_markup=_build_notifications_keyboard(notifications, source_menu=menu_type)
+                reply_markup=_build_notifications_keyboard(
+                    notifications, 
+                    source_menu=full_menu_type
+                )
             )
         await callback.answer()
         
