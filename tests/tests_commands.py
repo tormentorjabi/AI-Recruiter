@@ -167,7 +167,6 @@ async def create_notifications(message: Message):
                 telegram_id=str(message.from_user.id),
                 full_name="Maxim",
                 is_approved=True,
-                work_mode=True,
                 created_at=datetime.utcnow()
             )
             
