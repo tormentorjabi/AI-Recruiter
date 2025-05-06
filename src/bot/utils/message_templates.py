@@ -155,6 +155,17 @@ def hr_deleted_message(hr_full_name: str, telegram_id: str) -> str:
     )
 
 
+def show_admin_helper_message(admin_name: str) -> str:
+    return (
+        f"Добрый день, *{admin_name}*!\n\n"
+        "Доступные команды:\n"
+        "*/get_reviews* - Меню HR-специалиста\n\n"
+        "*/generate_token* - Генерация токена регистрации HR\n"
+        "*/list_hr* - Список HR-специалистов в системе\n"
+        "*/delete_hr* - Удалить HR-специалиста из системы\n"
+    )
+    
+    
 SHOW_DELETE_HR_COMMAND_HELPER = (
     "❌ Использование: */delete_hr <Telegram ID HR-специалиста>*\n"
     "Пример: */delete_hr 123456789*"
