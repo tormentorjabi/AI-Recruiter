@@ -80,14 +80,16 @@ async def process_token(message: Message, state: FSMContext):
         
 @hr_registration_router.message(StateFilter(HrRegistrationStates.waiting_for_full_name))
 async def process_full_name(message: Message, state: FSMContext):
-    full_name = message.text.strip()
-    user_data = await state.get_data()
-    token_id = user_data['token_id']
-    
-    hr_full_name = None
-    hr_telegram_id = None
-
     try:
+        # Не проводим валидацию имени помимо пустого сообщения, потому что с именами никогда не знаешь наверняка
+        name_input = message.text.strip()
+        full_name = name_input if len(name_input) > 0 else "HR специалист"
+        user_data = await state.get_data()
+        token_id = user_data['token_id']
+        
+        hr_full_name = None
+        hr_telegram_id = None
+
         with Session() as db:
             existing_hr = db.query(HrSpecialist).filter_by(
                 telegram_id=str(message.from_user.id)
