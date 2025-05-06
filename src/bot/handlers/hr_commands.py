@@ -21,7 +21,7 @@ from src.database.models import (
 )
 
 from src.bot.utils.bot_answers_json_builder import build_json
-from src.bot.utils.handle_error import handle_db_error
+from src.bot.utils.error_handlers import handle_db_error
 
 
 logger = logging.getLogger(__name__)
