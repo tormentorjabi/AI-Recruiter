@@ -12,6 +12,7 @@ from aiogram.types import (
     InlineKeyboardButton, InlineKeyboardMarkup
 )
 from datetime import datetime
+from sqlalchemy import or_
 
 from src.database.session import Session
 from src.database.models import (
@@ -20,7 +21,7 @@ from src.database.models import (
 )
 
 from src.bot.utils.bot_answers_json_builder import build_json
-from src.bot.utils.handle_error import handle_db_error
+from src.bot.utils.error_handlers import handle_db_error
 
 
 logger = logging.getLogger(__name__)
@@ -28,56 +29,6 @@ hr_commands_router = Router()
 
 ACCEPT_DECISION = True
 DECLINE_DECISION = False
-
-
-class ToggleWorkModeStates(StatesGroup):
-    waiting_for_confirmation = State()
-
-
-# --------------------------
-#  Confirmation Handlers
-# --------------------------
-@hr_commands_router.message(
-    StateFilter(ToggleWorkModeStates.waiting_for_confirmation),
-    F.text.casefold().in_({"да", "yes", "д", "y"})
-)
-async def _confirm_change_work_mode(message: Message, state: FSMContext):
-    try:
-        data = await state.get_data()
-        
-        with Session() as db:
-            hr = db.query(HrSpecialist).get(data['hr_id'])
-        
-            if not hr:
-                await message.answer(msg_templates.HR_NOT_FOUND_IN_DATABASE)
-                await state.clear()
-                return
-
-            new_status = not hr.work_mode
-            hr.work_mode = new_status
-            db.commit()
-
-            status_text = "Активен" if new_status else "Не активен"
-            await message.answer(
-            msg_templates.work_mode_changed_message(
-                status_text=status_text,
-                status=new_status
-            ),
-            parse_mode="Markdown"
-            )
-        
-        await state.clear()
-    except Exception as e:
-        logger.error(f"Error in confirm change work mode: {str(e)}")
-        await handle_db_error(message)
-    
-
-@hr_commands_router.message(
-    StateFilter(ToggleWorkModeStates.waiting_for_confirmation)
-)
-async def _cancel_change_work_mode(message: Message, state: FSMContext):
-    await message.answer(msg_templates.WORK_MODE_CHANGE_CANCELLED)
-    await state.clear()
 
 
 # --------------------------
@@ -98,14 +49,10 @@ def get_status_display(status: str) -> str:
     return status_map.get(status, f"Неизвестный ({status})")
 
 
-def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
-    # Сортируем все решения по следующему принципу:
-    # 1. В обработке (отсортированы по уменьшению оценки GigaChat)
-    # 2. Новые (отсортированы по уменьшению оценки GigaChat)
-    # 3. Одобренные (отсортированы по уменьшению оценки GigaChat)
-    # 4. Отказанные (отсортированы по уменьшению оценки GigaChat)
-    
+def _build_notifications_keyboard(notifications, source_menu: str, page: int = 0, items_per_page: int = 10):
+    # Все решения сортируются по уменьшению оценки GigaChat
     with Session() as db:
+        # Словарь типа: {application_id: gigachat_score (resume score)}
         resume_scores = {
             r.application_id: r.gigachat_score 
             for r in db.query(Resume).filter(
@@ -117,10 +64,10 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
     
     sorted_notifications = sorted(
         notifications,
-        key=lambda x: (
-            {"processing": 0, "new": 1, "approved": 2, "declined": 3}.get(x.status, 4),
+        key=lambda notif: (
+            {"processing": 0, "new": 1, "approved": 2, "declined": 3}.get(notif.status, 4),
             # Объединенная оценка по резюме + по ответам
-            -((x.analysis_score or 0) * 1 + (resume_scores.get(x.application_id, 0) * 1))
+            -((notif.analysis_score or 0) * 1 + (resume_scores.get(notif.application_id, 0) * 1))
             )
     )
 
@@ -141,7 +88,7 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
             keyboard.append([
                 InlineKeyboardButton(
                     text=btn_text,
-                    callback_data=f"notification_detail_{notification.id}"
+                    callback_data=f"notification_detail_{notification.id}_{source_menu}"
                 )
             ])
     
@@ -150,7 +97,7 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
         if page > 0:
             pagination.append(InlineKeyboardButton(
                 text="◀️", 
-                callback_data=f"notifications_page_{page-1}"
+                callback_data=f"notifications_page_{source_menu}_{page-1}"
             ))
         pagination.append(InlineKeyboardButton(
             text=f"{page+1}/{total_pages}", 
@@ -159,50 +106,38 @@ def _build_notifications_keyboard(notifications, page=0, items_per_page=10):
         if page < total_pages - 1:
             pagination.append(InlineKeyboardButton(
                 text="▶️", 
-                callback_data=f"notifications_page_{page+1}"
+                callback_data=f"notifications_page_{source_menu}_{page+1}"
             ))
         keyboard.append(pagination)
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
+
+def _get_archive_keyboard() -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text=msg_templates.REVIEW_APPROVED, 
+                callback_data="get_notifications_a_approved")],
+            [InlineKeyboardButton(
+                text=msg_templates.REVIEW_DECLINED, 
+                callback_data="get_notifications_a_declined")],
+            [InlineKeyboardButton(
+                text=msg_templates.BACK_TO_LIST, 
+                callback_data="back_to_main_menu")]
+        ]) 
+    return keyboard
+
    
 # --------------------------
 #  Init Commands Handlers
 # --------------------------
-@hr_commands_router.message(Command('change_work_mode'))
-async def _toggle_work_mode(
-    message: Message,
-    state: FSMContext
-):
-    try:
-        with Session() as db:
-            hr = db.query(HrSpecialist).filter_by(
-                telegram_id=str(message.from_user.id),
-                is_approved=True
-            ).first()
-
-            if not hr:
-                await message.answer(
-                    msg_templates.NOT_REGISTERED_AS_HR,
-                    parse_mode="Markdown"
-                )
-                return
-            
-            hr_work_mode = hr.work_mode
-            
-            await state.update_data(hr_id=hr.id)
-            await message.answer(
-                    msg_templates.confirm_change_work_mode_message(work_mode=hr_work_mode),
-                )
-            await state.set_state(ToggleWorkModeStates.waiting_for_confirmation)
-    except Exception as e:
-        logger.error(f"Error in change work mode: {str(e)}")
-        await handle_db_error(message)
-
-
+'''
+    TODO:
+        - /get_archive - показать архив (двойной - approved/declined)
+'''
 @hr_commands_router.message(Command("get_reviews"))
-async def _get_reviews(message: Message, user=None):
-    '''Получить список решений, готовых к обработке специалистами'''
+async def _get_reviews_selection(message: Message, user=None):
+    '''Сформировать меню с выбором категории решений'''
     try:
         with Session() as db:
             user_id = user.id if user else message.from_user.id
@@ -218,21 +153,33 @@ async def _get_reviews(message: Message, user=None):
                     parse_mode="Markdown"
                 )
                 return
-
-            notifications = db.query(HrNotification).join(Vacancy).all()
             
-            if not notifications:
+            all_notifications = db.query(HrNotification).all()
+            
+            if not all_notifications:
                 await message.answer(msg_templates.EMPTY_REVIEWS)
                 return
-                
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text=msg_templates.NEW_REVIEWS_BUTTON, 
+                    callback_data="get_notifications_n")],
+                [InlineKeyboardButton(
+                    text=msg_templates.PROCESSING_REVIEWS_BUTTON, 
+                    callback_data="get_notifications_p")],
+                [InlineKeyboardButton(
+                    text=msg_templates.ARCHIVE_REVIEWS_BUTTON, 
+                    callback_data="archive_menu")]
+            ])
+            
             await message.answer(
-                msg_templates.AVAILABLE_REVIEWS,
-                reply_markup=_build_notifications_keyboard(notifications)
+                msg_templates.HR_MENU_SELECT,
+                reply_markup=keyboard
             )
     except Exception as e:
-        logger.error(f'Get reviews error: {str(e)}')
+        logger.error(f'Get new reviews error: {str(e)}')
         await handle_db_error(message)
-      
+    
         
 # --------------------------
 #  Display Handlers
@@ -240,20 +187,46 @@ async def _get_reviews(message: Message, user=None):
 @hr_commands_router.callback_query(F.data.startswith("notifications_page_"))
 async def _handle_notifications_pagination(callback: CallbackQuery):
     try:
-        page = int(callback.data.split("_")[-1])
+        parts = callback.data.split("_")
+        menu_type = parts[2]
+        page = int(parts[3])
+
+        if len(parts) > 4:
+            archive_type = parts[4]
+            full_menu_type = f"{menu_type}_{archive_type}"
+        else:
+            archive_type = None
+            full_menu_type = menu_type
+        
         with Session() as db:
-            hr = db.query(HrSpecialist).filter(
-                HrSpecialist.telegram_id == str(callback.from_user.id)
-            ).first()
-            
-            notifications = db.query(HrNotification).join(
-                Vacancy
-            ).filter(
-                HrNotification.hr_specialist_id == hr.id
-            ).all()
+            if menu_type == 'n':
+                notifications = db.query(HrNotification).filter(
+                    HrNotification.status == 'new'
+                ).join(Vacancy).all()
+            elif menu_type == 'p':
+                notifications = db.query(HrNotification).filter(
+                    HrNotification.status == 'processing'
+                ).join(Vacancy).all()
+            elif menu_type == 'a':
+                if archive_type == 'approved':
+                    notifications = db.query(HrNotification).filter(
+                        HrNotification.status == 'approved'
+                    ).join(Vacancy).all()
+                elif archive_type == 'declined':
+                    notifications = db.query(HrNotification).filter(
+                        HrNotification.status == 'declined'
+                    ).join(Vacancy).all()
+                else:
+                    notifications = db.query(HrNotification).filter(
+                        HrNotification.status.in_(['approved', 'declined'])
+                    ).join(Vacancy).all()
             
             await callback.message.edit_reply_markup(
-                reply_markup=_build_notifications_keyboard(notifications, page)
+                reply_markup=_build_notifications_keyboard(
+                    notifications=notifications, 
+                    source_menu=full_menu_type,
+                    page=page
+                )
             )
         await callback.answer()
     except Exception as e:
@@ -261,12 +234,77 @@ async def _handle_notifications_pagination(callback: CallbackQuery):
         await handle_db_error(callback.message)
 
 
+@hr_commands_router.callback_query(F.data.startswith("get_notifications_"))
+async def _get_notifications_by_status(callback: CallbackQuery):
+    '''Фильтрация необходимых решений, в зависимости от выбранного меню'''
+    try:
+        with Session() as db:
+            parts = callback.data.split("_")
+            menu_type = parts[2]
+            
+            if len(parts) > 3:
+                archive_type = parts[3]
+            else:
+                archive_type = None
+                
+            match menu_type:
+                case 'n':
+                    text = msg_templates.NEW_REVIEWS
+                    notifications = db.query(HrNotification).filter_by(
+                        status='new'
+                        ).join(Vacancy).all()
+                case 'p':
+                    text = msg_templates.PROCESSING_REVIEWS
+                    notifications = db.query(HrNotification).filter_by(
+                        status='processing'
+                        ).join(Vacancy).all()
+                case 'a':
+                    if archive_type == 'approved':
+                        text = msg_templates.ARCHIVE_APPROVED
+                        notifications = db.query(HrNotification).filter_by(
+                            status='approved'
+                        ).join(Vacancy).all()
+                    elif archive_type == 'declined':
+                        text = msg_templates.ARCHIVE_DECLINED
+                        notifications = db.query(HrNotification).filter_by(
+                            status='declined'
+                        ).join(Vacancy).all()
+                    else:
+                        text = msg_templates.ARCHIVE_REVIEWS
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status.in_(['approved', 'declined'])
+                        ).join(Vacancy).all()
+                case _:
+                    await callback.answer("Недопустипый тип меню")
+                    return
+            await callback.message.answer(
+                text,
+                reply_markup=_build_notifications_keyboard(
+                    notifications,
+                    source_menu=f"{menu_type}_{archive_type}" if archive_type else menu_type
+                )
+            )
+        await callback.answer()    
+    except Exception as e:
+        logger.error(f'_get_notification_by_status error: {str(e)}')
+        await handle_db_error(callback.message) 
+    
+
 @hr_commands_router.callback_query(F.data.startswith("notification_detail_"))
-async def _show_notification_detail(callback: CallbackQuery):
+async def _show_notification_detail(callback: CallbackQuery, source_menu: str = None):
     '''Показать меню справочной информации по кандидату'''
     try:
-        notification_id = int(callback.data.split("_")[-1])
-        
+        if callback.data.startswith("notification_detail_"):
+            parts = callback.data.split("_")
+            notification_id = int(parts[2])
+            source_menu = parts[3]
+            
+            if len(parts) > 4 and parts[3] == 'a':
+                source_menu = f"{parts[3]}_{parts[4]}"
+        else:
+            notification_id = int(callback.data.split("_")[-1])
+            source_menu = source_menu or 'p'
+
         with Session() as db:
             notification = db.query(HrNotification).join(
                 Candidate
@@ -333,9 +371,8 @@ async def _show_notification_detail(callback: CallbackQuery):
             ]
             keyboard.append([InlineKeyboardButton(
                 text=msg_templates.BACK_TO_LIST,
-                callback_data="back_to_list"
+                callback_data=f"back_to_list_{source_menu}"
             )])
-            
             await callback.message.edit_text(
                 detail_text,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
@@ -345,6 +382,22 @@ async def _show_notification_detail(callback: CallbackQuery):
     except Exception as e:
         logger.error(f'Error in show notifications detail: {str(e)}')
         await handle_db_error(callback.message)
+
+
+@hr_commands_router.callback_query(F.data == "archive_menu")
+async def _show_archive_menu(callback: CallbackQuery):
+    try:
+        keyboard = _get_archive_keyboard()
+        
+        await callback.message.edit_text(
+            msg_templates.ARCHIVE_TYPE_CHOOSE,
+            reply_markup=keyboard
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f'Error showing archive menu: {str(e)}')
+        await handle_db_error(callback.message) 
+
 
 
 @hr_commands_router.callback_query(F.data.startswith("get_answers_"))
@@ -422,7 +475,7 @@ async def _start_processing(callback: CallbackQuery):
             db.commit()
             
             await callback.answer(msg_templates.MARK_REVIEW_AS_PROCESSING)
-            await _show_notification_detail(callback)
+            await _show_notification_detail(callback, source_menu='n')
     except Exception as e:
         logger.error(f'Error after start processing review: {str(e)}')
         await handle_db_error(callback.message)
@@ -461,7 +514,7 @@ async def _approve_candidate(callback: CallbackQuery):
                 decision=ACCEPT_DECISION
             )         
             await callback.answer(msg_templates.MARK_REVIEW_AS_ACCEPTED)
-            await _show_notification_detail(callback)
+            await _show_notification_detail(callback, source_menu='p')
     except Exception as e:
         logger.error(f'Error after approve review: {str(e)}')
         await (callback.message)
@@ -500,7 +553,7 @@ async def _decline_candidate(callback: CallbackQuery):
                 decision=DECLINE_DECISION
             )
             await callback.answer(msg_templates.MARK_REVIEW_AS_DECLINED)
-            await _show_notification_detail(callback)
+            await _show_notification_detail(callback, source_menu='p')
     except Exception as e:
         logger.error(f'Error after decline review: {str(e)}')
         await handle_db_error(callback.message)
@@ -530,10 +583,73 @@ async def _notify_candidate(
 # --------------------------
 #  Other Handlers
 # --------------------------
-@hr_commands_router.callback_query(F.data == "back_to_list")
+@hr_commands_router.callback_query(F.data == "back_to_main_menu")
+async def _back_to_main_menu(callback: CallbackQuery):
+    try:
+        await _get_reviews_selection(callback.message, user=callback.from_user)
+        await callback.answer()
+    except Exception as e:
+        logger.error(f'Error returning to main menu: {str(e)}')
+        await handle_db_error(callback.message)
+        
+
+@hr_commands_router.callback_query(F.data.startswith("back_to_list_"))
 async def _back_to_list(callback: CallbackQuery):
-    await _get_reviews(callback.message, user=callback.from_user)
-    await callback.answer()
+    try:
+        parts = callback.data.split("_")
+        menu_type = parts[3]
+
+        if len(parts) > 4:
+            archive_type = parts[4]
+            full_menu_type = f"{menu_type}_{archive_type}"
+        else:
+            archive_type = None
+            full_menu_type = menu_type
+        
+        with Session() as db:
+            match menu_type:
+                case 'n':
+                    notifications = db.query(HrNotification).filter_by(
+                        status='new'
+                    ).join(Vacancy).all()
+                    text = msg_templates.NEW_REVIEWS
+                case 'p':
+                    notifications = db.query(HrNotification).filter_by(
+                        status='processing'
+                    ).join(Vacancy).all()
+                    text = msg_templates.PROCESSING_REVIEWS
+                case 'a':
+                    if archive_type == 'approved':
+                        text = msg_templates.ARCHIVE_APPROVED
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status == 'approved'
+                        ).join(Vacancy).all()
+                    elif archive_type == 'declined':
+                        text = msg_templates.ARCHIVE_DECLINED
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status == 'declined'
+                        ).join(Vacancy).all()
+                    else:
+                        text = msg_templates.ARCHIVE_REVIEWS
+                        notifications = db.query(HrNotification).filter(
+                            HrNotification.status.in_(['approved', 'declined'])
+                        ).join(Vacancy).all()
+                case _:
+                    await callback.answer("Invalid menu type")
+                    return
+            
+            await callback.message.edit_text(
+                text,
+                reply_markup=_build_notifications_keyboard(
+                    notifications, 
+                    source_menu=full_menu_type
+                )
+            )
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error in _back_to_list: {str(e)}")
+        await callback.answer("Failed to go back. Please try again.")
 
 
 @hr_commands_router.callback_query(F.data == "noop")

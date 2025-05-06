@@ -8,7 +8,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from src.database.session import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Candidate(Base):
@@ -38,7 +38,7 @@ class Candidate(Base):
     relocation_ready = Column(Boolean, nullable=True)
     telegram_id = Column(String(50))
     status = Column(String(50), server_default='pending')
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime)
     
     resumes = relationship("Resume", back_populates="candidate", cascade="all, delete")

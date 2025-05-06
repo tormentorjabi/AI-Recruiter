@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from src.bot.config import TELEGRAM_BOT_TOKEN
 
 # Основные роутеры
-from src.bot.handlers.start_command import start_router
 from src.bot.handlers.admin_commands import admin_router
 from src.bot.handlers.hr_registration import hr_registration_router
 from src.bot.handlers.hr_commands import hr_commands_router
@@ -33,5 +32,4 @@ dp.include_routers(
     candidate_router,
     hr_registration_router,
     hr_commands_router,
-    #start_router
 )

@@ -9,7 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from src.database.session import Base
 from enum import Enum as PyEnum
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class InteractionState(PyEnum):
@@ -43,8 +43,8 @@ class BotInteraction(Base):
     vacancy_id = Column(Integer, ForeignKey('vacancies.id'))
     answers = Column(JSON, default={})
     state = Column(Enum(InteractionState), default=InteractionState.STARTED)
-    started_at = Column(DateTime, default=datetime.utcnow)
-    last_active = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    started_at = Column(DateTime, default=datetime.now(timezone.utc))
+    last_active = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     completed_at = Column(DateTime)
     
     candidate = relationship("Candidate", back_populates="interactions")

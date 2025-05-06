@@ -11,7 +11,7 @@ from datetime import datetime
 from src.database.session import Session
 from src.database.models import (
     Candidate, Application, Vacancy, BotQuestion,
-    HrNotification, HrSpecialist
+    HrNotification, HrSpecialist, Resume
 )
 
 from src.database.models.application import ApplicationStatus
@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 tests_router = Router()
 
 
-def generate_random_score():
+def generate_random_score() -> int:
     while True:
-        random_number = random.random() * 100
+        random_number = random.randint(0, 100)
         if 0 <= random_number <= 100:
-            return round(random_number / 100, 2)
+            return random_number
 
 
 @tests_router.message(Command('clr_db'))
@@ -140,7 +140,7 @@ async def populate_database_and_generate_candidate_token_test(message: Message):
 async def create_notifications(message: Message):
     try:
         args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
-        count = int(args[0].strip())
+        count = int(args[0].strip()) if len(args) > 0 else 1
         with Session() as db:
             await message.answer(
                 "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ БД..."
@@ -167,7 +167,6 @@ async def create_notifications(message: Message):
                 telegram_id=str(message.from_user.id),
                 full_name="Maxim",
                 is_approved=True,
-                work_mode=True,
                 created_at=datetime.utcnow()
             )
             
@@ -185,6 +184,16 @@ async def create_notifications(message: Message):
             db.add(application)
             db.flush()
 
+            resume = Resume(
+                candidate_id=candidate.id,
+                application_id=application.id,
+                resume_link="",
+                gigachat_score=generate_random_score(),
+                analysis_status='completed',
+                created_at=datetime.utcnow()
+            )
+            db.add(resume)
+            
             for i in range(0, count):
                 score = generate_random_score()
                 notification = HrNotification(
