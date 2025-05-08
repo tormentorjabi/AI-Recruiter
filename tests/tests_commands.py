@@ -31,7 +31,7 @@ def generate_random_score() -> int:
 
 
 @tests_router.message(Command('vacancies_test'))
-async def create_notifications(message: Message):
+async def create_vacancies(message: Message):
     try:
         args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
         count = int(args[0].strip()) if len(args) > 0 else 1
@@ -40,21 +40,33 @@ async def create_notifications(message: Message):
                 "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ БД..."
             )
          
-            # Создаем и записываем в БД тестовую вакансию
+            # Создаем и записываем в БД тестовую вакансию и вопросы
             for i in range(0, count):
                 vacancy = Vacancy(
                     title = f'Тестовая вакансия {i}',
                     description = f'Описание для вакансии {i}',
+
                     created_at = datetime.now(timezone.utc)
                 )
                 db.add(vacancy)
-            
+                db.flush()
+                
+                for i in range(0, count):
+                    question = BotQuestion(
+                        vacancy_id = vacancy.id,
+                        question_text = f"Текст вопроса - {i}",
+                        order = i,
+                        expected_format = 'TEXT',
+                        is_for_screening = random.choice([True, False]),
+                        screening_criteria = f'Промпт {i}',
+                    )
+                    db.add(question)
             db.commit()    
         await message.answer(
         "🔥 БД ЗАПОЛНЕНА ТЕСТОВЫМИ ДАННЫМИ"
     )
     except Exception as e:
-        logger.error(f'Error in create_notifications: {str(e)}')
+        logger.error(f'Error in create_vacancies: {str(e)}')
 
 
 @tests_router.message(Command('clr_db'))
