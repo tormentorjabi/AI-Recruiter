@@ -4,9 +4,8 @@ import random
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text
-from datetime import datetime
 
 from src.database.session import Session
 from src.database.models import (
@@ -29,6 +28,33 @@ def generate_random_score() -> int:
         random_number = random.randint(0, 100)
         if 0 <= random_number <= 100:
             return random_number
+
+
+@tests_router.message(Command('vacancies_test'))
+async def create_notifications(message: Message):
+    try:
+        args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
+        count = int(args[0].strip()) if len(args) > 0 else 1
+        with Session() as db:
+            await message.answer(
+                "ПРИСТУПАЕМ К ЗАПОЛНЕНИЮ БД..."
+            )
+         
+            # Создаем и записываем в БД тестовую вакансию
+            for i in range(0, count):
+                vacancy = Vacancy(
+                    title = f'Тестовая вакансия {i}',
+                    description = f'Описание для вакансии {i}',
+                    created_at = datetime.now(timezone.utc)
+                )
+                db.add(vacancy)
+            
+            db.commit()    
+        await message.answer(
+        "🔥 БД ЗАПОЛНЕНА ТЕСТОВЫМИ ДАННЫМИ"
+    )
+    except Exception as e:
+        logger.error(f'Error in create_notifications: {str(e)}')
 
 
 @tests_router.message(Command('clr_db'))
