@@ -39,12 +39,6 @@ class CandidateStates(StatesGroup):
 # --------------------------
 #  Core Utilities
 # --------------------------
-# async def handle_db_error(message: Message, error_msg: str = "Произошла ошибка"):
-#     '''Лог ошибок, возникающих в результате ошибок БД'''
-#     await message.answer(f"⚠️ {error_msg}. Попробуйте позже.")
-#     logger.error(error_msg)
-
-
 async def _update_last_active(candidate_id: int, application_id: int):
     try:
         with Session() as db:
