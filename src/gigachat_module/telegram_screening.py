@@ -65,15 +65,22 @@ class TelegramScreening:
         try:
             focus_answer = candidate_answers_formatter(candidate_responses_json, focus_key)
             if focus_answer:
-                tasks.append(HumanMessage(content=focus_answer))
+                tasks.append(HumanMessage(content=(
+                    f'{prompts.TG_CUSTOMER_FOCUS_CRITERIA}\n'
+                    f'{focus_answer}')))
             
             software_answer = candidate_answers_formatter(candidate_responses_json, software_key)
             if software_answer:
-                tasks.append(HumanMessage(content=software_answer))
+                tasks.append(HumanMessage(content=(
+                    f'{prompts.TG_SOFTWARE_CRITERIA}\n'
+                    f'{software_answer}')))
             
             stress_answer = candidate_answers_formatter(candidate_responses_json, stress_key)
             if stress_answer:
-                tasks.append(HumanMessage(content=stress_answer))
+                tasks.append(HumanMessage(content=(
+                    f'{prompts.TG_STRESS_AT_CALLCENTER_CRITERIA}\n'
+                    f'{stress_answer}'
+                )))
 
             return tasks
         except Exception as e:
