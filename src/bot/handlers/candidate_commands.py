@@ -782,7 +782,10 @@ async def handle_proceed_to_llm(
     # Инициализируем скрининг с Telegam бота
     tg_screening = TelegramScreening()
     # Отправляем ответы кандидата на оценку в GigaChat
-    telegram_screening_score = await tg_screening.screen_answers(answers)
+    telegram_screening_score = await tg_screening.screen_answers(
+        candidate_responses_json=answers,
+        vacancy_id=vacancy_id
+    )
     try:
         analysis_score = int(telegram_screening_score)
     except (ValueError, TypeError):
