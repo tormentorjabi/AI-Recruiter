@@ -1,7 +1,7 @@
 import logging
 import src.bot.utils.message_templates as msg_templates
 
-from typing import List, Union
+from typing import List, Union, Optional
 from sqlalchemy import desc
 from aiogram import F
 from aiogram import Router
@@ -14,7 +14,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
 from src.database.session import Session
-from src.database.models import (Vacancy, Application, BotQuestion)
+from src.database.models import Vacancy, Application, BotQuestion
+from src.database.models.bot_question import AnswerFormat
 from src.bot.config import ADMIN_CHANNEL_ID, ADMIN_USER_ID
 from src.bot.utils.error_handlers import handle_db_error
 
@@ -26,6 +27,7 @@ admin_screening = Router()
 class QuestionEditingStates(StatesGroup):
     waiting_for_new_text = State()
     waiting_for_screening_criteria = State()
+    waiting_for_new_choices = State()
     confirming_delete = State()
 
 
@@ -187,7 +189,7 @@ async def _edit_question_detail_menu(msg_or_query: Union[Message, CallbackQuery]
             msg_or_query = msg_or_query.message
         
         with Session() as db:
-            question = db.query(BotQuestion).get(question_id)
+            question: Optional[BotQuestion] = db.query(BotQuestion).get(question_id)
             if not question:
                 await msg_or_query.answer("Вопрос не найден")
                 return
@@ -197,10 +199,13 @@ async def _edit_question_detail_menu(msg_or_query: Union[Message, CallbackQuery]
                 if question.is_for_screening and question.screening_criteria
                 else "\n\n🤖 Промпт не настроен"
             )
+
+            choices_info = ("Варианты ответов:\n" + " | ".join(question.choices)) if question.choices else ""
             
             detail_text = (
                 f"📝 Вопрос №{question.order}:\n\n"
                 f"{question.question_text}"
+                f"\n{choices_info}"
                 f"{screening_info}"
             )
             
@@ -208,6 +213,10 @@ async def _edit_question_detail_menu(msg_or_query: Union[Message, CallbackQuery]
                 [InlineKeyboardButton(
                     text="✏️ Редактировать текст вопроса",
                     callback_data=f"edit_info_{question.id}_q"
+                )],
+                [InlineKeyboardButton(
+                    text="✏️ Редактировать варианты ответов" if question.choices else "➕ Добавить варианты ответа к вопросу",
+                    callback_data=f"edit_info_{question.id}_c" if question.choices else f"add_choices_{question.id}"
                 )],
                 [InlineKeyboardButton(
                     text="🤖 Редактировать промпт для вопроса" if question.is_for_screening else "➕ Добавить промпт для вопроса",
@@ -387,7 +396,7 @@ async def _edit_question_info(callback: CallbackQuery, state: FSMContext):
     try:
         parts = callback.data.split("_")
         # Callback data соответствует строке edit_info_{question_id}_{type}
-        # Где type = ("p", "q") для p - промпта или q - вопроса, соответственно.
+        # Где type = ("p", "q", "c") для p - промпта,  q - вопроса, c - вариантов ответа соответственно.
         type = parts[-1]
         question_id = int(parts[-2])
         
@@ -424,6 +433,21 @@ async def _edit_question_info(callback: CallbackQuery, state: FSMContext):
                         )]
                     ])
                 )
+            
+            elif type == 'c':
+                await state.set_state(QuestionEditingStates.waiting_for_new_choices)
+                await callback.message.edit_text(
+                f"Текущие варианты ответов:\n\n{" | ".join(question.choices)}\n\n"
+                "❗️Введите новые варианты ответов, *через запятую* (регистр не имеет значение)*\n"
+                "*Пример:* 'полный день, гибкий график, удаленная работа' - распознается как 3 варианта ответа",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="❌ Отменить",
+                        callback_data=f"cancel_edit_{question_id}"
+                        )]
+                    ]),
+                parse_mode="Markdown"               
+                )
         await callback.answer()
     except Exception as e:
         logger.error(f'Error starting screening criteria edit: {str(e)}')
@@ -456,6 +480,73 @@ async def _process_new_question_text(message: Message, state: FSMContext):
         logger.error(f'Error updating question text: {str(e)}')
         await state.clear()
         await handle_db_error(message)
+
+
+@admin_screening.message(StateFilter(QuestionEditingStates.waiting_for_new_choices))
+async def _process_new_choices_text(message: Message, state: FSMContext):
+    try:
+        data = await state.get_data()
+        question_id = data.get('question_id')
+        
+        if not message.text:
+            await message.answer(
+                "Пожалуйста, введите варианты ответа текстом, *через запятую*",
+                parse_mode="Markdown"
+            )
+            return
+            
+        with Session() as db:
+            question: Optional[BotQuestion] = db.query(BotQuestion).get(question_id)
+            if question:
+                if question.expected_format == AnswerFormat.TEXT:
+                    question.expected_format = AnswerFormat.CHOICE
+                
+                choices = [choice.strip().capitalize() for choice in message.text.split(',')]
+                question.choices = choices
+                db.commit()
+                
+                await message.answer("Варианты ответов успешно обновлены")
+                await state.clear()
+                await _edit_question_detail_menu(message, question_id=question_id)
+            else:
+                await message.answer("Вопрос не найден")
+                await state.clear()
+    except Exception as e:
+        logger.error(f'Error updating question choices: {str(e)}')
+        await state.clear()
+        await handle_db_error(message)
+
+
+@admin_screening.callback_query(F.data.startswith("add_choices_"))
+async def _add_question_choices(callback: CallbackQuery, state: FSMContext):
+    try:
+        question_id = int(callback.data.split("_")[-1])
+        
+        with Session() as db:
+            question: Optional[BotQuestion] = db.query(BotQuestion).get(question_id)
+            if not question:
+                await callback.answer("Вопрос не найден")
+                return
+                  
+            await state.update_data(question_id=question_id)
+            await state.set_state(QuestionEditingStates.waiting_for_new_choices)
+            
+            await callback.message.edit_text(
+                "Добавление вариантов ответа:\n\n"
+                "❗️Введите варианты ответа на вопрос, *через запятую (регистр не имеет значение)*\n"
+                "*Пример:* 'полный день, гибкий график, удаленная работа' - распознается как 3 варианта ответа",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="❌ Отменить",
+                        callback_data=f"cancel_edit_{question_id}"
+                    )]
+                ]),
+                parse_mode="Markdown"
+            )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f'Error adding question choices: {str(e)}')
+        await handle_db_error(callback.message)
 
 
 @admin_screening.message(StateFilter(QuestionEditingStates.waiting_for_screening_criteria))
