@@ -37,15 +37,15 @@ def fetch_new_resumes_data() -> List[Tuple[str, int]]:
             
             test_vacancy_id_1 = vacancy1.id
             
-            for q_data in QUESTION_DATA:
-                question = BotQuestion(
-                    vacancy_id = test_vacancy_id_1,
-                    question_text = q_data['question_text'],
-                    order = q_data['order'],
-                    expected_format = q_data['expected_format'],
-                    choices = q_data['choices']
-                )
-                db.add(question)
+            # for q_data in QUESTION_DATA:
+            #     question = BotQuestion(
+            #         vacancy_id = test_vacancy_id_1,
+            #         question_text = q_data['question_text'],
+            #         order = q_data['order'],
+            #         expected_format = q_data['expected_format'],
+            #         choices = q_data['choices']
+            #     )
+            #     db.add(question)
 
             db.commit()
         except Exception as e:
