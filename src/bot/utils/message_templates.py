@@ -162,6 +162,7 @@ def show_admin_helper_message(admin_name: str) -> str:
         f"Добрый день, *{admin_name}*!\n\n"
         "Доступные команды:\n"
         "*/get_reviews* - Меню HR-специалиста\n\n"
+        "*/list_vacancies* - Меню настроек параметров вакансий\n"
         "*/generate_token* - Генерация токена регистрации HR\n"
         "*/list_hr* - Список HR-специалистов в системе\n"
         "*/delete_hr* - Удалить HR-специалиста из системы\n"
