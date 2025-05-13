@@ -77,13 +77,13 @@ def _build_questions_keyboard(questions: List[BotQuestion], vacancy_id: int, pag
     
     keyboard.append([
         InlineKeyboardButton(
-            text="➕ Создать новый вопрос",
+            text=msg_templates.CREATE_NEW_QUESTION,
             callback_data=f"create_question_{vacancy_id}"
         )
     ])
     keyboard.append([
         InlineKeyboardButton(
-            text="❌ Отменить редактирование",
+            text=msg_templates.CANCEL_EDIT_VACANCY,
             callback_data=f"vacancy_detail_{vacancy_id}"
         )
     ])
@@ -175,11 +175,11 @@ async def _list_vacancies(message: Message):
             vacancies = db.query(Vacancy).order_by(desc(Vacancy.created_at)).all()
             
             if not vacancies:
-                await message.answer('В системе нет вакансий')
+                await message.answer(msg_templates.NO_VACANCIES_IN_SYSTEM)
                 return
             
             await message.answer(
-                "Список вакансий:",
+                msg_templates.VACANCIES_LIST,
                 reply_markup=_build_vacancies_keyboard(vacancies)
             )
     except Exception as e:
@@ -201,59 +201,52 @@ async def _edit_question_detail_menu(msg_or_query: Union[Message, CallbackQuery]
         with Session() as db:
             question: Optional[BotQuestion] = db.query(BotQuestion).get(question_id)
             if not question:
-                await msg_or_query.answer("Вопрос не найден")
+                await msg_or_query.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
             
-            screening_info = (
-                f"\n\n🤖 Промпт для вопроса:\n{question.screening_criteria}"
-                if question.is_for_screening and question.screening_criteria
-                else "\n\n🤖 Промпт не настроен"
-            )
-
-            choices_info = ("Варианты ответов:\n" + " | ".join(question.choices)) if question.choices else ""
-            
-            detail_text = (
-                f"📝 Вопрос №{question.order}:\n\n"
-                f"{question.question_text}"
-                f"\n{choices_info}"
-                f"{screening_info}"
+            detail_text = msg_templates.vacancy_question_detail_message(
+                question_order=question.order,
+                question_text=question.question_text,
+                choices=question.choices,
+                is_for_screening=question.is_for_screening,
+                screening_criteria=question.screening_criteria
             )
             
             keyboard = [
                 [InlineKeyboardButton(
-                    text="✏️ Редактировать текст вопроса",
+                    text=msg_templates.EDIT_QUESTION_TEXT,
                     callback_data=f"edit_info_{question.id}_q")],
                 [InlineKeyboardButton(
-                    text="✏️ Редактировать варианты ответов" if question.choices else "➕ Добавить варианты ответа к вопросу",
+                    text=msg_templates.EDIT_QUESTION_CHOICES if question.choices else msg_templates.ADD_QUESTION_CHOICES,
                     callback_data=f"edit_info_{question.id}_c" if question.choices else f"add_choices_{question.id}")]]
 
             keyboard.extend([[
                 InlineKeyboardButton(
-                    text="🤖 Редактировать промпт для вопроса" if question.is_for_screening else "➕ Добавить промпт для вопроса",
+                    text=msg_templates.EDIT_QUESTION_PROMPT if question.is_for_screening else msg_templates.ADD_QUESTION_PROMPT,
                     callback_data=f"edit_info_{question.id}_p" if question.is_for_screening else f"add_screening_{question.id}")]])
             
             keyboard.extend([[
                 InlineKeyboardButton(
-                    text="____________________________________________________",
+                    text=msg_templates.EMPTY_BUTTON,
                     callback_data="noop")]])
             
             if question.choices:
                 keyboard.append([InlineKeyboardButton(
-                    text="🗑️ Удалить варианты ответов у вопроса",
+                    text=msg_templates.DELETE_QUESTION_CHOICES,
                     callback_data=f"delete_question_{question.id}_c")])
 
             if question.screening_criteria:
                 keyboard.append([InlineKeyboardButton(
-                    text="🗑️ Удалить промпт для вопроса",
+                    text=msg_templates.DELETE_QUESTION_PROMPT,
                     callback_data=f"delete_question_{question.id}_p")])
                 
             keyboard.extend([[InlineKeyboardButton(
-                    text="🗑️ Удалить вопрос",
+                    text=msg_templates.DELETE_QUESTION,
                     callback_data=f"delete_question_{question.id}_q")]])
 
             keyboard.extend([[
                 InlineKeyboardButton(
-                    text="🔙 Назад к списку вопросов",
+                    text=msg_templates.TO_QUESTIONS_LIST,
                     callback_data=f"edit_vacancy_params_{question.vacancy_id}")]])
             try:
                 await msg_or_query.edit_text(
@@ -277,14 +270,14 @@ async def _show_vacancy_params(callback: CallbackQuery):
         with Session() as db:
             vacancy = db.query(Vacancy).get(vacancy_id)
             if not vacancy:
-                await callback.message.answer("Вакансия не найдена")
+                await callback.message.answer(msg_templates.VACANCY_NOT_FOUND)
                 return
             
             questions = db.query(BotQuestion).filter_by(
                 vacancy_id=vacancy_id
             ).order_by(BotQuestion.order).all()
             if not questions:
-                await callback.message.answer("У данной вакансии нет вопросов")
+                await callback.message.answer(msg_templates.NO_QUESTIONS_FOR_VACANCY)
                 return
             
             question_texts = ""
@@ -321,7 +314,7 @@ async def _edit_vacancy_params_menu(msg_or_query: Union[Message, CallbackQuery],
             vacancy = db.query(Vacancy).get(vacancy_id)
                 
             if not vacancy:
-                await msg_or_query.answer("Вакансия не найдена")
+                await msg_or_query.answer(msg_templates.VACANCY_NOT_FOUND)
                 return
             
             questions = db.query(BotQuestion).filter_by(
@@ -329,27 +322,25 @@ async def _edit_vacancy_params_menu(msg_or_query: Union[Message, CallbackQuery],
             ).order_by(BotQuestion.order).all()
             if not questions:
                 await msg_or_query.answer(
-                    "У данной вакансии нет вопросов",
+                    msg_templates.NO_QUESTIONS_FOR_VACANCY,
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(
-                            text="➕ Создать вопросы",
+                            text=msg_templates.CREATE_NEW_QUESTION,
                             callback_data=f"create_question_{vacancy_id}"
                         )],
                         [InlineKeyboardButton(
-                            text="🔙 Назад",
-                            callback_data=f"vacancy_detail_{vacancy_id}"
-                        )]
-                    ])
-                )
+                            text=msg_templates.BACK_TO_LIST,
+                            callback_data=f"vacancy_detail_{vacancy_id}")]])
+                    )
                 return
             
             try:
                 await msg_or_query.edit_text(
-                    "📝 Редактирование вопросов вакансии:",
+                    msg_templates.EDITING_VACANCY_QUESTIONS,
                     reply_markup=_build_questions_keyboard(questions, vacancy_id))
             except:
                 await msg_or_query.answer(
-                    "📝 Редактирование вопросов вакансии:",
+                    msg_templates.EDITING_VACANCY_QUESTIONS,
                     reply_markup=_build_questions_keyboard(questions, vacancy_id))
     except Exception as e:
             logger.error(f'Error editing vacancy params details: {str(e)}')
@@ -364,7 +355,7 @@ async def _show_vacancy_detail(callback: CallbackQuery):
         with Session() as db:
             vacancy = db.query(Vacancy).get(vacancy_id)
             if not vacancy:
-                await callback.answer("Вакансия не найдена")
+                await callback.answer(msg_templates.VACANCY_NOT_FOUND)
                 return
             
             status_counts = db.query(
@@ -383,29 +374,29 @@ async def _show_vacancy_detail(callback: CallbackQuery):
             approved_application_count = count_dict.get(ApplicationStatus.ACCEPTED, 0)
             declined_application_count = count_dict.get(ApplicationStatus.REJECTED, 0)
             
-            detail_text = (
-                f"📌 Вакансия:\n{vacancy.title}\n\n"
-                f"📝 Описание вакансии:\n{vacancy.description}\n\n"
-                f"📅 Всего откликов в системе: {application_count}\n"
-                f"🔍 Ещё не приступили к анкете: {active_application_count}\n"
-                f"⏳ Откликов в обработке: {review_application_count}\n"
-                f"✅ Одобренных откликов: {approved_application_count}\n"
-                f"❌ Отклоненных откликов: {declined_application_count}"
+            detail_text = msg_templates.vacancy_detail_message(
+                title=vacancy.title,
+                description=vacancy.description,
+                all=application_count,
+                active=active_application_count,
+                review=review_application_count,
+                approved=approved_application_count,
+                declined=declined_application_count
             )
-            
+              
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
-                    text="📝 Просмотреть параметры вакансии",
+                    text=msg_templates.VIEW_VACANCY_PARAMS,
                     callback_data=f"vacancy_params_{vacancy_id}"
                 )],
                 
                 [InlineKeyboardButton(
-                    text="✏️ Редактировать параметры вакансии",
+                    text=msg_templates.EDIT_VACANCY_PARAMS,
                     callback_data=f"edit_vacancy_params_{vacancy_id}"
                 )],
 
                 [InlineKeyboardButton(
-                    text="🔙 Назад к списку",
+                    text=msg_templates.BACK_TO_LIST,
                     callback_data="back_to_vacancies_list"
                 )]
             ])
@@ -427,7 +418,7 @@ async def _back_to_vacancies_list(callback: CallbackQuery):
             vacancies = db.query(Vacancy).order_by(desc(Vacancy.created_at)).all()
             
             await callback.message.edit_text(
-                "📋 Список вакансий в системе:",
+                msg_templates.VACANCIES_LIST,
                 reply_markup=_build_vacancies_keyboard(vacancies)
             )
         await callback.answer()
@@ -451,7 +442,7 @@ async def _edit_question_info(callback: CallbackQuery, state: FSMContext):
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
             if not question:
-                await callback.answer("Вопрос не найден")
+                await callback.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
             
             await state.update_data(question_id=question_id)
@@ -459,24 +450,24 @@ async def _edit_question_info(callback: CallbackQuery, state: FSMContext):
                 await state.set_state(QuestionEditingStates.waiting_for_screening_criteria)
                 current_criteria = question.screening_criteria or "Не задано"
                 await callback.message.edit_text(
-                f"Текущий промпт для вопроса:\n\n{current_criteria}\n\n"
-                "Введите новый промпт:",
+                text=msg_templates.edit_prompt_message(current_criteria),
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="❌ Отменить",
+                        text=msg_templates.CANCEL_EDIT_VACANCY,
                         callback_data=f"cancel_op_{question_id}"
                         )]
-                    ])
-                )
+                    ]
+                ), 
+                parse_mode="Markdown"
+            )
                 
             elif type == 'q':
                 await state.set_state(QuestionEditingStates.waiting_for_new_text)
                 await callback.message.edit_text(
-                f"Текущий текст вопроса:\n\n{question.question_text}\n\n"
-                "Введите новый текст вопроса:",
+                text=msg_templates.edit_question_text_message(question.question_text),
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="❌ Отменить",
+                        text=msg_templates.CANCEL_EDIT_VACANCY,
                         callback_data=f"cancel_op_{question_id}"
                         )]
                     ])
@@ -485,12 +476,10 @@ async def _edit_question_info(callback: CallbackQuery, state: FSMContext):
             elif type == 'c':
                 await state.set_state(QuestionEditingStates.waiting_for_new_choices)
                 await callback.message.edit_text(
-                f"Текущие варианты ответов:\n\n{' | '.join(question.choices)}\n\n"
-                "❗️Введите новые варианты ответов, *через запятую (регистр не имеет значение)*\n\n"
-                "*Пример:* 'полный день, гибкий график, удаленная работа' - распознается как 3 варианта ответа",
+                text=msg_templates.edit_choices_message(question.choices),
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="❌ Отменить",
+                        text=msg_templates.CANCEL_EDIT_VACANCY,
                         callback_data=f"cancel_op_{question_id}"
                         )]
                     ]),
@@ -512,7 +501,7 @@ async def _create_new_question(callback: CallbackQuery, state: FSMContext):
         with Session() as db:
             vacancy: Optional[Vacancy] = db.query(Vacancy).get(vacancy_id)
             if not vacancy:
-                await callback.answer("Вакансия не найдена")
+                await callback.answer(msg_templates.VACANCY_NOT_FOUND)
                 return
                   
             await state.update_data(vacancy_id=vacancy_id)
@@ -520,17 +509,17 @@ async def _create_new_question(callback: CallbackQuery, state: FSMContext):
             
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
-                    text="📝 Текстовый вопрос",
+                    text=msg_templates.TEXT_TYPE,
                     callback_data="question_type_text"
                 )],
                 
                 [InlineKeyboardButton(
-                    text="🔘 С вариантами ответа",
+                    text=msg_templates.CHOICES_TYPE,
                     callback_data="question_type_choice"
                 )],
 
                 [InlineKeyboardButton(
-                   text="❌ Отменить создание вопроса",
+                    text=msg_templates.CANCEL_QUESTION_CREATION,
                     callback_data=f"vacancy_detail_{vacancy_id}"
                 )]])    
                 
@@ -559,7 +548,7 @@ async def _handle_question_type_selection(callback: CallbackQuery, state: FSMCon
             "Введите текст вопроса:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
-                    text="❌ Отменить создание",
+                    text=msg_templates.CANCEL_QUESTION_CREATION,
                     callback_data=f"vacancy_detail_{data.get('vacancy_id')}"
                 )]
             ])
@@ -574,7 +563,7 @@ async def _handle_question_type_selection(callback: CallbackQuery, state: FSMCon
 async def _process_question_text(message: Message, state: FSMContext):
     try:
         if not message.text:
-            await message.answer("Пожалуйста, введите текстовый вопрос")
+            await message.answer(msg_templates.INCORRECT_INPUT_PROVIDED)
             return
             
         data = await state.get_data()
@@ -586,10 +575,10 @@ async def _process_question_text(message: Message, state: FSMContext):
             await state.set_state(QuestionEditingStates.waiting_for_choices)
             await message.answer(
                 "Введите варианты ответов, *через запятую*:\n"
-                "Пример: 'полный день, гибкий график, удалённая работа'",
+                "*Пример:* 'полный день, гибкий график, удалённая работа'",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="❌ Отменить создание",
+                        text=msg_templates.CANCEL_QUESTION_CREATION,
                         callback_data=f"vacancy_detail_{data.get('vacancy_id')}"
                     )]
                 ]),
@@ -633,15 +622,15 @@ async def _show_save_confirmation(message: Message, state: FSMContext):
     
     keyboard = [
         [InlineKeyboardButton(
-            text="✅ Сохранить вопрос",
+            text=msg_templates.SAVE_QUESTION,
             callback_data="save_question"
         )],
         [InlineKeyboardButton(
-            text="🤖 Добавить промпт для скрининга вопроса",
+            text=msg_templates.ADD_PROMPT,
             callback_data="add_screening_to_question"
         )],
         [InlineKeyboardButton(
-            text="❌ Отменить создание",
+            text=msg_templates.CANCEL_QUESTION_CREATION,
             callback_data=f"vacancy_detail_{data.get('vacancy_id')}"
         )]
     ]
@@ -681,7 +670,7 @@ async def _save_new_question(callback: CallbackQuery, state: FSMContext):
             db.add(new_question)
             db.commit()
             
-            await callback.message.edit_text("Вопрос успешно сохранён!")
+            await callback.message.edit_text(msg_templates.QUESTION_SAVED)
             await _edit_vacancy_params_menu(callback, vacancy_id=vacancy_id)
         
         await state.clear()
@@ -700,13 +689,17 @@ async def _add_screening_to_new_question(callback: CallbackQuery, state: FSMCont
         await state.set_state(QuestionEditingStates.waiting_for_new_screening_criteria)
         
         await callback.message.edit_text(
-            "Введите промпт для этого вопроса:",
+            text=(
+                f'{msg_templates.PROMPT_CREATE_HELPER}'
+                "🤖 *Введите новый промпт:*"
+            ),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
-                    text="❌ Отменить создание",
+                    text=msg_templates.CANCEL_QUESTION_CREATION,
                     callback_data=f"vacancy_detail_{data.get('vacancy_id')}"
                 )]
-            ])
+            ]),
+            parse_mode="Markdown"
         )
         await callback.answer()
     except Exception as e:
@@ -718,7 +711,11 @@ async def _add_screening_to_new_question(callback: CallbackQuery, state: FSMCont
 async def _process_new_question_screening(message: Message, state: FSMContext):
     try:
         if not message.text:
-            await message.answer("Пожалуйста, введите критерии скрининга")
+            await message.answer(
+                f"{msg_templates.PROMPT_CREATE_HELPER}"
+                "🤖 *Введите новый промпт:*",
+                parse_mode="Markdown"
+            )
             return
             
         data = await state.get_data()
@@ -745,7 +742,7 @@ async def _process_new_question_screening(message: Message, state: FSMContext):
             db.add(new_question)
             db.commit()
             
-            await message.answer("Вопрос успешно сохранён!")
+            await message.answer(msg_templates.QUESTION_SAVED)
             await _edit_vacancy_params_menu(message, vacancy_id=vacancy_id)
         
         await state.clear()
@@ -773,11 +770,11 @@ async def _process_new_question_text(message: Message, state: FSMContext):
                 question.question_text = message.text
                 db.commit()
                 
-                await message.answer("Текст вопроса успешно обновлён")
+                await message.answer("✅ Текст вопроса успешно обновлён")
                 await state.clear()
                 await _edit_question_detail_menu(message, question_id=question_id)
             else:
-                await message.answer("Вопрос не найден")
+                await message.answer(msg_templates.QUESTION_NOT_FOUND)
                 await state.clear()
     except Exception as e:
         logger.error(f'Error updating question text: {str(e)}')
@@ -812,11 +809,11 @@ async def _process_new_choices_text(message: Message, state: FSMContext):
                 question.choices = choices
                 db.commit()
 
-                await message.answer("Варианты ответов успешно обновлены")
+                await message.answer("✅ Варианты ответов успешно обновлены")
                 await state.clear()
                 await _edit_question_detail_menu(message, question_id=question_id)
             else:
-                await message.answer("Вопрос не найден")
+                await message.answer(msg_templates.QUESTION_NOT_FOUND)
                 await state.clear()
     except Exception as e:
         logger.error(f'Error updating question choices: {str(e)}')
@@ -832,7 +829,7 @@ async def _add_question_choices(callback: CallbackQuery, state: FSMContext):
         with Session() as db:
             question: Optional[BotQuestion] = db.query(BotQuestion).get(question_id)
             if not question:
-                await callback.answer("Вопрос не найден")
+                await callback.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
                   
             await state.update_data(question_id=question_id)
@@ -876,11 +873,11 @@ async def _process_new_screening_criteria(message: Message, state: FSMContext):
                 question.screening_criteria = message.text
                 db.commit()
                 
-                await message.answer("Промпт успешно добавлен")
+                await message.answer("✅ Промпт успешно добавлен")
                 await state.clear()
                 await _edit_question_detail_menu(message, question_id=question_id)
             else:
-                await message.answer("Вопрос не найден")
+                await message.answer(msg_templates.QUESTION_NOT_FOUND)
                 await state.clear()
     except Exception as e:
         logger.error(f'Error updating screening criteria: {str(e)}')
@@ -896,7 +893,7 @@ async def _add_screening_criteria(callback: CallbackQuery, state: FSMContext):
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
             if not question:
-                await callback.answer("Вопрос не найден")
+                await callback.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
                   
             await state.update_data(question_id=question_id)
@@ -904,13 +901,14 @@ async def _add_screening_criteria(callback: CallbackQuery, state: FSMContext):
             
             await callback.message.edit_text(
                 "Добавление промпта:\n\n"
-                "Введите текст промпта для скрининга ответа на этот вопрос:",
+                f"{msg_templates.PROMPT_CREATE_HELPER}"
+                "🤖 *Введите текст промпта:*",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="❌ Отменить",
+                        text=msg_templates.CANCEL_EDIT_VACANCY,
                         callback_data=f"cancel_op_{question_id}"
                     )]
-                ])
+                ]),parse_mode="Markdown"
             )
         await callback.answer()
     except Exception as e:
@@ -930,7 +928,7 @@ async def _delete_question_data(callback: CallbackQuery, state: FSMContext):
         with Session() as db:
             question = db.query(BotQuestion).get(question_id)
             if not question:
-                await callback.answer("Вопрос не найден")
+                await callback.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
             
             detail_text = ""
@@ -941,21 +939,21 @@ async def _delete_question_data(callback: CallbackQuery, state: FSMContext):
             
             if op == "q":
                 detail_text = (
-                    f"Вы уверены, что хотите удалить вопрос?\n\n"
+                    f"*Вы уверены, что хотите удалить вопрос?*\n\n"
                     f"Вопрос №{q_order}: {q_text}"
                 )
             elif op == "c":
                 detail_text = (
-                    f"Вы уверены, что хотите удалить варианты к вопросу?\n\n"
+                    f"*Вы уверены, что хотите удалить варианты к вопросу?*\n\n"
                     f"Вопрос №{q_order}: {q_text}"
                 )
             elif op == "p":
                 detail_text = (
-                    f"Вы уверены, что хотите удалить промпт для вопроса?\n\n"
+                    f"*Вы уверены, что хотите удалить промпт для вопроса?*\n\n"
                     f"Вопрос №{q_order}: {q_text}"
                 )
             else:
-                await callback.answer("Неизвестная операция над вопросом")
+                await callback.answer(msg_templates.INCORRECT_QUESTION_OPERATION)
                 return
                 
             await callback.message.edit_text(
@@ -971,7 +969,8 @@ async def _delete_question_data(callback: CallbackQuery, state: FSMContext):
                             callback_data=f"cancel_op_{question_id}"
                         )
                     ]
-                ])
+                ]),
+                parse_mode="Markdown"
             )
         await callback.answer()
     except Exception as e:
@@ -991,7 +990,7 @@ async def _confirm_delete_question_data(callback: CallbackQuery, state: FSMConte
         with Session() as db:
             question: Optional[BotQuestion] = db.query(BotQuestion).get(question_id)
             if not question:
-                await callback.answer("Вопрос не найден")
+                await callback.answer(msg_templates.QUESTION_NOT_FOUND)
                 return
             
             if op == "q":
@@ -1008,7 +1007,7 @@ async def _confirm_delete_question_data(callback: CallbackQuery, state: FSMConte
                     q.order = index
                 db.commit()
                 
-                await callback.message.edit_text("Вопрос успешно удален")
+                await callback.message.edit_text("🗑️ Вопрос успешно удален")
                 await _edit_vacancy_params_menu(callback, vacancy_id=vacancy_id)
             
             elif op == "c":
@@ -1016,7 +1015,7 @@ async def _confirm_delete_question_data(callback: CallbackQuery, state: FSMConte
                 question.expected_format = AnswerFormat.TEXT
                 db.commit()
                 
-                await callback.message.edit_text("Варианты ответа успешно удалены")
+                await callback.message.edit_text("🗑️ Варианты ответа успешно удалены")
                 await _edit_question_detail_menu(callback, question_id=question_id)
                 
             elif op == "p":
@@ -1024,11 +1023,11 @@ async def _confirm_delete_question_data(callback: CallbackQuery, state: FSMConte
                 question.is_for_screening = False
                 db.commit()
                 
-                await callback.message.edit_text("Промпт успешно удален")
+                await callback.message.edit_text("🗑️ Промпт успешно удален")
                 await _edit_question_detail_menu(callback, question_id=question_id)
                 
             else:
-                await callback.answer("Неизвестная операция над вопросом")
+                await callback.answer(msg_templates.INCORRECT_QUESTION_OPERATION)
                 return
         await state.clear()
     except Exception as e:
