@@ -54,11 +54,10 @@ async def create_vacancies(message: Message):
                 for i in range(0, count):
                     question = BotQuestion(
                         vacancy_id = vacancy.id,
-                        question_text = f"Текст вопроса - {i}",
+                        question_text = f"Текст вопроса #{i}",
                         order = i,
                         expected_format = 'TEXT',
-                        is_for_screening = random.choice([True, False]),
-                        screening_criteria = f'Промпт {i}',
+                        is_for_screening = False
                     )
                     db.add(question)
             db.commit()    

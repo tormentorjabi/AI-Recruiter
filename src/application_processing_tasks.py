@@ -27,8 +27,8 @@ def fetch_new_resumes_data() -> List[Tuple[str, int]]:
     with Session() as db:
         try:
             vacancy1 = Vacancy(
-                title="Вакансия #1",
-                description="Описание вакансии",
+                title="Оператор контактного центра",
+                description="Оператор контактного центра ПЦП ЕРКЦ (г. Екатеринбург)",
                 created_at=datetime.now(timezone.utc)
             )
 
@@ -37,15 +37,17 @@ def fetch_new_resumes_data() -> List[Tuple[str, int]]:
             
             test_vacancy_id_1 = vacancy1.id
             
-            # for q_data in QUESTION_DATA:
-            #     question = BotQuestion(
-            #         vacancy_id = test_vacancy_id_1,
-            #         question_text = q_data['question_text'],
-            #         order = q_data['order'],
-            #         expected_format = q_data['expected_format'],
-            #         choices = q_data['choices']
-            #     )
-            #     db.add(question)
+            for q_data in QUESTION_DATA:
+                question = BotQuestion(
+                    vacancy_id = test_vacancy_id_1,
+                    question_text = q_data['question_text'] if 'question_text' in q_data else None,
+                    order = q_data['order'] if 'order' in q_data else None,
+                    expected_format = q_data['expected_format'] if 'expected_format' in q_data else None,
+                    choices = q_data['choices'] if 'choices' in q_data else None,
+                    is_for_screening = q_data['is_for_screening'] if 'is_for_screening' in q_data else False,
+                    screening_criteria = q_data['screening_criteria'] if 'screening_criteria' in q_data else None
+                )
+                db.add(question)
 
             db.commit()
         except Exception as e:
