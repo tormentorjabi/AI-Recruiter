@@ -47,7 +47,7 @@ async def _update_last_active(candidate_id: int, application_id: int):
                 application_id=application_id
             ).first()
             if interaction:
-                interaction.last_active = datetime.utcnow()
+                interaction.last_active = datetime.now(timezone.utc)
                 db.commit()
     except Exception as e:
         logger.error(f"Error updating last_active: {str(e)}")
@@ -79,7 +79,7 @@ async def _update_interaction_state(application_id: int, state_data: dict):
         if interaction:
             interaction.answers = state_data['answers']
             interaction.current_question_id = state_data['questions'][state_data['current_question']]
-            interaction.last_active = datetime.utcnow()
+            interaction.last_active = datetime.now(timezone.utc)
             db.commit()
 
 
@@ -233,7 +233,7 @@ async def handle_token_auth(message: Message, state: FSMContext):
     '''Обработка идентификации кандидата по его токену'''
     try:
         token = message.text.strip()
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         telegram_id = str(message.from_user.id)
         
         with Session() as db:
@@ -376,7 +376,7 @@ async def candidate_start(message: Message, state: FSMContext):
 
             if interaction and interaction.state == InteractionState.PAUSED:
                 # Ответы кандидата хранятся 24 часов, затем форму нужно заполнять с начала
-                if (datetime.utcnow() - interaction.last_active) > timedelta(hours=24):
+                if (datetime.now(timezone.utc) - interaction.last_active) > timedelta(hours=24):
                     db.delete(interaction)
                     db.commit()
                     await message.answer(
@@ -410,7 +410,7 @@ async def candidate_start(message: Message, state: FSMContext):
                     current_question_id=questions[0].id,
                     vacancy_id=application.vacancy_id,
                     state=InteractionState.STARTED,
-                    last_active=datetime.utcnow()
+                    last_active=datetime.now(timezone.utc)
                 )
                 db.add(interaction)
                 # Заполняем FSMContext state данными об единице интерактива
@@ -740,7 +740,7 @@ async def handle_submission(callback: CallbackQuery, state: FSMContext):
                 application_id=data['application_id']
             ).first()
             interaction.state = InteractionState.COMPLETED
-            interaction.completed_at = datetime.utcnow()
+            interaction.completed_at = datetime.now(timezone.utc)
                  
             db.commit()
  
