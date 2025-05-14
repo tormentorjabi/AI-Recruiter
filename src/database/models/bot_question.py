@@ -4,7 +4,8 @@ from sqlalchemy import (
     Integer, 
     Text,
     ForeignKey,
-    JSON
+    JSON,
+    Boolean
 )
 from enum import Enum as PyEnum
 from sqlalchemy.orm import relationship
@@ -26,6 +27,8 @@ class BotQuestion(Base):
         order (int): Порядок вопроса в сценарии
         expected_format (enum): Ожидаемый тип ответа ('text' / 'file' / 'choice')
         choices (JSON): Варианты ответа при expected_format = 'choice'
+        is_for_screening (bool): Проходит ли вопрос скрининг
+        screening_criteria (text): Промпт для оценивания вопроса на скрининге
     """
     __tablename__ = 'bot_questions'
     
@@ -35,6 +38,8 @@ class BotQuestion(Base):
     order = Column(Integer)
     expected_format = Column(Enum(AnswerFormat), nullable=False)
     choices = Column(JSON, nullable=True)
+    is_for_screening = Column(Boolean, nullable=True)
+    screening_criteria = Column(Text, nullable=True)
     
     interactions = relationship("BotInteraction", back_populates="current_question")
     vacancy = relationship("Vacancy", back_populates="questions")

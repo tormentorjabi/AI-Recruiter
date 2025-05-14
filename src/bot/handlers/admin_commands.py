@@ -1,4 +1,5 @@
 import logging
+
 import src.bot.utils.message_templates as msg_templates
 
 from aiogram import F
@@ -22,46 +23,54 @@ class DeleteHRStates(StatesGroup):
     waiting_for_confirmation = State()
 
 
+#---------------
+# Init Handlers
+#---------------
 @admin_router.message(
     Command('start'),
-    F.chat.id == ADMIN_CHANNEL_ID
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
 )
-async def start_as_admin(message: Message):
+async def _start_as_admin(message: Message):
     try:
         with Session() as db:
-                admin = db.query(HrSpecialist).filter_by(
-                    telegram_id=str(ADMIN_USER_ID)
-                ).first()
-                user_full_name = message.from_user.full_name
-                admin_name = user_full_name if user_full_name else 'Администратор'
+            admin = db.query(HrSpecialist).filter_by(
+                telegram_id=str(ADMIN_USER_ID)
+            ).first()
+            user_full_name = message.from_user.full_name
+            admin_name = user_full_name if user_full_name else 'Администратор'
+            
+            if not admin:
+                admin = HrSpecialist(
+                telegram_id=str(ADMIN_USER_ID),
+                full_name=admin_name,
+                is_approved=True)
+                db.add(admin)
+                db.commit()
                 
-                if not admin:
-                    admin = HrSpecialist(
-                    telegram_id=str(ADMIN_USER_ID),
-                    full_name=admin_name,
-                    is_approved=True)
-                    db.add(admin)
-                    db.commit()
-                    
-                    await message.answer(
-                        msg_templates.show_admin_helper_message(admin_name=admin_name),
-                        parse_mode="Markdown"
-                    )
-                else:
-                    await message.answer(
-                        msg_templates.show_admin_helper_message(admin_name=admin_name),
-                        parse_mode="Markdown"
-                    )
+                await message.answer(
+                    msg_templates.show_admin_helper_message(admin_name=admin_name),
+                    parse_mode="Markdown"
+                )
+            else:
+                await message.answer(
+                    msg_templates.show_admin_helper_message(admin_name=admin_name),
+                    parse_mode="Markdown"
+                )
     except Exception as e:
         logger.error(f'Error in start_as_admin: {str(e)}')
         await handle_db_error(message)
     
 
+#---------------
+# Main Commands Handlers
+#---------------
 @admin_router.message(
     Command('generate_token'),
-    F.chat.id == ADMIN_CHANNEL_ID
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
 )
-async def generate_token(message: Message):
+async def _generate_token(message: Message):
     await message.answer(
         msg_templates.COMMAND_ACCEPTED
     )
@@ -91,9 +100,10 @@ async def generate_token(message: Message):
 
 @admin_router.message(
     Command('list_hr'),
-    F.chat.id == ADMIN_CHANNEL_ID
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
 )
-async def get_hr_list(message: Message):
+async def _get_hr_list(message: Message):
     try:
         with Session() as db:
             hrs = db.query(HrSpecialist).filter_by(
@@ -124,9 +134,10 @@ async def get_hr_list(message: Message):
 
 @admin_router.message(
     Command('delete_hr'),
-    F.chat.id == ADMIN_CHANNEL_ID
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
 )
-async def delete_hr(
+async def _delete_hr(
     message: Message,
     state: FSMContext
 ):
@@ -178,11 +189,14 @@ async def delete_hr(
         handle_db_error(message)
 
 
+#---------------
+# Confirmation Handlers
+#---------------
 @admin_router.message(
     StateFilter(DeleteHRStates.waiting_for_confirmation),
     F.text.casefold().in_({"да", "yes", "д", "y"})
 )
-async def confirm_delete(message: Message, state: FSMContext):
+async def _confirm_delete_hr(message: Message, state: FSMContext):
     data = await state.get_data()
     try:
         with Session() as db:
@@ -214,6 +228,6 @@ async def confirm_delete(message: Message, state: FSMContext):
 @admin_router.message(
     StateFilter(DeleteHRStates.waiting_for_confirmation)
 )
-async def cancel_delete(message: Message, state: FSMContext):
+async def _cancel_delete_hr(message: Message, state: FSMContext):
     await message.answer(msg_templates.HR_DELETE_CANCELLED)
     await state.clear()

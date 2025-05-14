@@ -4,7 +4,8 @@ from sqlalchemy import (
     Integer, 
     Enum,
     DateTime,
-    JSON
+    JSON,
+    Boolean
 )
 from sqlalchemy.orm import relationship
 from src.database.session import Base
@@ -18,6 +19,7 @@ class InteractionState(PyEnum):
     REVIEW = "review"
     COMPLETED = "completed"
     PAUSED = "paused"
+    NO_CONSENT = "no_consent"
 
 class BotInteraction(Base):
     """
@@ -30,6 +32,7 @@ class BotInteraction(Base):
         vacancy_id (int): FK на вакансию
         answers (JSON): Промежуточные ответы {question_id: answer_text}
         state (enum): Статус интерактива
+        personal_data_consent (bool): Согласие на обработку персональных данных, в рамках отклика
         started_at (datetime): Время начала интерактива
         last_active (datetime): Последнее время интерактива
         completed_at (datetime): Время завершения интерактива
@@ -43,6 +46,7 @@ class BotInteraction(Base):
     vacancy_id = Column(Integer, ForeignKey('vacancies.id'))
     answers = Column(JSON, default={})
     state = Column(Enum(InteractionState), default=InteractionState.STARTED)
+    personal_data_consent = Column(Boolean, nullable=True)
     started_at = Column(DateTime, default=datetime.now(timezone.utc))
     last_active = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     completed_at = Column(DateTime)
