@@ -4,13 +4,13 @@
 
 ## Стек технологий
 
-- **[Python](https://www.python.org/doc/),**
-- **[AIOgram](https://aiogram.dev/),** 
-- **[GigaChain](https://github.com/ai-forever/gigachain),** 
-- **[PostgreSQL](https://www.postgresql.org/),**
-- **[MongoDB](https://www.mongodb.com/)** - для хранения AIOgram FSMContext State,
-- **[BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/bs4/doc/),**
-- **[SQLAlchemy](https://docs.sqlalchemy.org/en/20/),**
+- **[Python](https://www.python.org/doc/)**
+- **[AIOgram](https://aiogram.dev/)** 
+- **[GigaChain](https://github.com/ai-forever/gigachain)** 
+- **[PostgreSQL](https://www.postgresql.org/)**
+- **[MongoDB](https://www.mongodb.com/)** - для хранения AIOgram FSMContext State
+- **[BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)**
+- **[SQLAlchemy](https://docs.sqlalchemy.org/en/20/)**
 - **[AIOHTTP](https://docs.aiohttp.org/en/stable/)**
 
 ## Принцип работы приложения
