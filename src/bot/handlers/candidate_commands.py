@@ -1,11 +1,16 @@
 import logging
 import src.bot.utils.message_templates as msg_templates
 
+from typing import Optional
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    Message, CallbackQuery, InlineKeyboardButton, 
+    InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+)
+from aiogram.types.reply_keyboard_remove import ReplyKeyboardRemove
 from sqlalchemy import and_
 from datetime import datetime, timedelta, timezone
 
@@ -30,11 +35,21 @@ logger = logging.getLogger(__name__)
 candidate_router = Router()
 
 class CandidateStates(StatesGroup):
+    waiting_for_consent = State()
     token_auth = State()
     answering = State()
     review = State()
     editing = State()
 
+
+CONSENT_KEYBOARD = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text=msg_templates.CONSENT_AGREE_BUTTON)],
+        [KeyboardButton(text=msg_templates.CONSENT_DECLINE_BUTTON)]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
 # --------------------------
 #  Core Utilities
@@ -373,17 +388,40 @@ async def candidate_start(message: Message, state: FSMContext):
                     msg_templates.VACANCY_QUESTIONS_NOT_FOUND
                 )
                 return
-
+            
+            # Проверка на согласие на обработку персональных данных
+            if interaction:
+                consent_status = interaction.personal_data_consent
+                if consent_status is False:
+                    await message.answer(msg_templates.CANDIDATE_CONSENT_DECLINED,parse_mode="Markdown")
+                    return
+                
+                if consent_status is None:
+                    await message.answer(
+                        msg_templates.CANDIDATE_CONSENT_REQUEST,
+                        reply_markup=CONSENT_KEYBOARD,
+                        parse_mode="Markdown"
+                    )
+                    await state.set_state(CandidateStates.waiting_for_consent)
+                    await state.set_data({
+                        'candidate_id': candidate.id,
+                        'application_id': application.id,
+                        'vacancy_id': application.vacancy_id,
+                        'interaction_id': interaction.id if interaction else None
+                    })
+                    return
+                    
             if interaction and interaction.state == InteractionState.PAUSED:
                 # Ответы кандидата хранятся 24 часов, затем форму нужно заполнять с начала
-                if (datetime.now(timezone.utc) - interaction.last_active) > timedelta(hours=24):
+                # Beware, datetime.now(timezone.utc) will raise 'can't subtract offset-naive and offset-aware datetimes error'
+                if (datetime.utcnow() - interaction.last_active) > timedelta(hours=24):
                     db.delete(interaction)
                     db.commit()
                     await message.answer(
                         msg_templates.CANDIDATE_BOT_INTERACTION_SESSION_TIMEOUT
                     )
                     return
-                # Заполняем FSMContext state данными об единице интерактива 
+                # Заполняем state данными об единице интерактива 
                 state_data = {
                     'candidate_id': candidate.id,
                     'candidate_name': candidate.full_name,
@@ -401,7 +439,21 @@ async def candidate_start(message: Message, state: FSMContext):
                 # Возобновляем интерактив
                 interaction.state = InteractionState.STARTED
                 resume_question = questions[state_data['current_question']]
+                db.commit()
+                
+                await state.set_data(state_data)
+                # Приветственное сообщение для кандидата
                 await message.answer("🔄 Возобновляем ваше предыдущее заполнение формы")
+                await message.answer(
+                    msg_templates.get_candidate_on_start_bot_interaction_message(
+                        db_candidate_full_name=candidate.full_name,
+                        vacancy_title=application.vacancy.title,
+                        questions_length=len(questions)),
+                    parse_mode="Markdown"
+                )
+                # Начинаем показ вопросов из банка вопросов
+                await _show_question(resume_question, message, state)
+                await state.set_state(CandidateStates.answering)
             else:
                 # Создаем новую, пустую единицу интерактива
                 interaction = BotInteraction(
@@ -410,42 +462,115 @@ async def candidate_start(message: Message, state: FSMContext):
                     current_question_id=questions[0].id,
                     vacancy_id=application.vacancy_id,
                     state=InteractionState.STARTED,
+                    personal_data_consent=None,
                     last_active=datetime.now(timezone.utc)
                 )
                 db.add(interaction)
-                # Заполняем FSMContext state данными об единице интерактива
-                state_data = {
+                db.commit()
+                await message.answer(
+                    msg_templates.CANDIDATE_CONSENT_REQUEST,
+                    reply_markup=CONSENT_KEYBOARD,
+                    parse_mode="Markdown"
+                )
+                await state.set_state(CandidateStates.waiting_for_consent)
+                await state.set_data({
                     'candidate_id': candidate.id,
                     'candidate_name': candidate.full_name,
                     'application_id': application.id,
                     'vacancy_id': application.vacancy_id,
-                    'vacancy_title': application.vacancy.title,
-                    'questions': [q.id for q in questions],
-                    'answers': {},
-                    'current_question': 0,
-                    'resumed': False
-                }
-                resume_question = questions[0]
-            
-            db.commit()
-            await state.set_data(state_data)
-            # Приветственное сообщение для кандидата
-            await message.answer(
-                msg_templates.get_candidate_on_start_bot_interaction_message(
-                    db_candidate_full_name=candidate.full_name,
-                    vacancy_title=application.vacancy.title,
-                    questions_length=len(questions)),
-                parse_mode="Markdown"
-            )
-            # Начинаем показ вопросов из банка вопросов
-            await _show_question(resume_question, message, state)
-            await state.set_state(CandidateStates.answering)
-
+                    'interaction_id': interaction.id,
+                    'vacancy_title': application.vacancy.title
+                })
+                return
     except Exception as e:
         logger.error(f"Start error: {str(e)}")
         await handle_db_error(message)
 
 
+@candidate_router.message(
+    StateFilter(CandidateStates.waiting_for_consent),
+    F.text.in_([msg_templates.CONSENT_AGREE_BUTTON, msg_templates.CONSENT_DECLINE_BUTTON])
+)
+async def _handle_consent_response(message: Message, state: FSMContext):
+    try:
+        consent_given = message.text == msg_templates.CONSENT_AGREE_BUTTON
+        state_data = await state.get_data()
+        
+        with Session() as db:
+            interaction: Optional[BotInteraction] = db.query(BotInteraction).get(state_data['interaction_id'])
+            
+            if not interaction:
+                await message.answer(
+                    msg_templates.CANDIDATE_BOT_INTERACTION_NOT_FOUND,
+                    parse_mode="Markdown"
+                )
+                await state.clear()
+                return
+            
+            now = datetime.now(timezone.utc)
+            interaction.personal_data_consent = consent_given
+            interaction.last_active = now
+            
+            if not consent_given:
+                interaction.completed_at = now
+                interaction.state = InteractionState.NO_CONSENT
+                db.commit()
+                await message.answer(
+                    msg_templates.CANDIDATE_CONSENT_DECLINED_THANKYOU,
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode="Markdown"
+                )
+                await state.clear()
+                return
+                
+            questions = db.query(BotQuestion).filter(
+                BotQuestion.vacancy_id == state_data['vacancy_id']
+            ).order_by(BotQuestion.order).all()
+            
+            if not questions:
+                await message.answer(
+                    msg_templates.VACANCY_QUESTIONS_NOT_FOUND,
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode="Markdown"
+                )
+                await state.clear()
+                return
+                
+            # Заполняем state данными об единице интерактива 
+            new_state_data = {
+                'candidate_id': state_data['candidate_id'],
+                'candidate_name': state_data['candidate_name'],
+                'application_id': state_data['application_id'],
+                'vacancy_id': state_data['vacancy_id'],
+                'vacancy_title': state_data['vacancy_title'],
+                'questions': [q.id for q in questions],
+                'answers': {},
+                'current_question': 0,
+                'resumed': False
+            }
+            
+            interaction.state = InteractionState.STARTED
+            interaction.current_question_id = questions[0].id
+            db.commit()
+            
+            # Отправляем приветственное сообщение и начинаем показ вопросов
+            await state.set_data(new_state_data)
+            await message.answer(
+                msg_templates.get_candidate_on_start_bot_interaction_message(
+                    db_candidate_full_name=interaction.candidate.full_name,
+                    vacancy_title=interaction.vacancy.title,
+                    questions_length=len(questions)),
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardRemove()
+            )
+            await _show_question(questions[0], message, state)
+            await state.set_state(CandidateStates.answering)
+            
+    except Exception as e:
+        logger.error(f"Consent handling error: {str(e)}")
+        await handle_db_error(message)
+        
+        
 # --------------------------
 #  Question Navigation
 # --------------------------
