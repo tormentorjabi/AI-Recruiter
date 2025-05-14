@@ -14,13 +14,18 @@ import sys
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
 
-db_url = os.getenv('DB_URL', 'sqlite:///recruiter.db')
+DB_DRIVER = os.environ.get('DB_DRIVER')
+DB_USER = os.environ.get('DB_USER')
+DB_NAME = os.environ.get('DB_NAME')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_HOST = os.environ.get('DB_HOST')
 
+DB_URL = f'{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}'
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option('sqlalchemy.url', db_url)
+config.set_main_option('sqlalchemy.url', DB_URL)
 
 
 # Interpret the config file for Python logging.

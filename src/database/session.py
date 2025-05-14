@@ -7,22 +7,21 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
+DB_DRIVER = os.environ.get('DB_DRIVER')
+DB_USER = os.environ.get('DB_USER')
+DB_NAME = os.environ.get('DB_NAME')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_HOST = os.environ.get('DB_HOST')
 
-DATABASE_URL = os.getenv('DB_URL', 'sqlite:///recruiter.db')
+DB_URL = f'{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}'
 
-if DATABASE_URL.startswith('sqlite'):
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        echo=False  # Only for development
-    )
-else:
-    engine = create_engine(
-        DATABASE_URL,
-        pool_size=5,
-        max_overflow=10,
-        echo=False
-    )
+
+engine = create_engine(
+    DB_URL,
+    pool_size=5,
+    max_overflow=10,
+    echo=False
+)
 
 Base = declarative_base()
 
