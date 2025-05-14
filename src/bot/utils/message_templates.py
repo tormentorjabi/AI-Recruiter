@@ -63,7 +63,8 @@ CANDIDATE_APPLICATIONS_NOT_FOUND = (
 )
 
 VACANCY_QUESTIONS_NOT_FOUND = (
-    "⚠️ Для вакансии нет вопросов"
+    "⚠️ Прохождение анкеты для вакансии, на которую вы откикнулись, не настроено!\n"
+    "Решение по вашей кандидатуре будет проводиться классическим методом."
 )
 
 CANDIDATE_BOT_INTERACTION_SESSION_TIMEOUT = (
