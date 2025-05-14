@@ -405,9 +405,12 @@ async def candidate_start(message: Message, state: FSMContext):
                     await state.set_state(CandidateStates.waiting_for_consent)
                     await state.set_data({
                         'candidate_id': candidate.id,
+                        'candidate_name': candidate.full_name,
+                        'vacancy_title': application.vacancy.title,
                         'application_id': application.id,
                         'vacancy_id': application.vacancy_id,
-                        'interaction_id': interaction.id if interaction else None
+                        'interaction_id': interaction.id if interaction else None,
+                        'consent_retry': False
                     })
                     return
                     
@@ -479,7 +482,8 @@ async def candidate_start(message: Message, state: FSMContext):
                     'application_id': application.id,
                     'vacancy_id': application.vacancy_id,
                     'interaction_id': interaction.id,
-                    'vacancy_title': application.vacancy.title
+                    'vacancy_title': application.vacancy.title,
+                    'consent_retry': False
                 })
                 return
     except Exception as e:
@@ -511,61 +515,70 @@ async def _handle_consent_response(message: Message, state: FSMContext):
             interaction.personal_data_consent = consent_given
             interaction.last_active = now
             
-            if not consent_given:
-                interaction.completed_at = now
-                interaction.state = InteractionState.NO_CONSENT
+            if consent_given:
+                questions = db.query(BotQuestion).filter(
+                    BotQuestion.vacancy_id == state_data['vacancy_id']
+                ).order_by(BotQuestion.order).all()
+            
+                if not questions:
+                    await message.answer(
+                        msg_templates.VACANCY_QUESTIONS_NOT_FOUND,
+                        reply_markup=ReplyKeyboardRemove(),
+                        parse_mode="Markdown"
+                    )
+                    await state.clear()
+                    return
+                    
+                # Заполняем state данными об единице интерактива 
+                new_state_data = {
+                    'candidate_id': state_data['candidate_id'],
+                    'candidate_name': state_data['candidate_name'],
+                    'application_id': state_data['application_id'],
+                    'vacancy_id': state_data['vacancy_id'],
+                    'vacancy_title': state_data['vacancy_title'],
+                    'questions': [q.id for q in questions],
+                    'answers': {},
+                    'current_question': 0,
+                    'resumed': False
+                }
+                
+                interaction.state = InteractionState.STARTED
+                interaction.current_question_id = questions[0].id
                 db.commit()
-                await message.answer(
-                    msg_templates.CANDIDATE_CONSENT_DECLINED_THANKYOU,
-                    reply_markup=ReplyKeyboardRemove(),
-                    parse_mode="Markdown"
-                )
-                await state.clear()
-                return
                 
-            questions = db.query(BotQuestion).filter(
-                BotQuestion.vacancy_id == state_data['vacancy_id']
-            ).order_by(BotQuestion.order).all()
-            
-            if not questions:
+                # Отправляем приветственное сообщение и начинаем показ вопросов
+                await state.set_data(new_state_data)
                 await message.answer(
-                    msg_templates.VACANCY_QUESTIONS_NOT_FOUND,
-                    reply_markup=ReplyKeyboardRemove(),
-                    parse_mode="Markdown"
+                    msg_templates.get_candidate_on_start_bot_interaction_message(
+                        db_candidate_full_name=interaction.candidate.full_name,
+                        vacancy_title=interaction.vacancy.title,
+                        questions_length=len(questions)),
+                    parse_mode="Markdown",
+                    reply_markup=ReplyKeyboardRemove()
                 )
-                await state.clear()
-                return
-                
-            # Заполняем state данными об единице интерактива 
-            new_state_data = {
-                'candidate_id': state_data['candidate_id'],
-                'candidate_name': state_data['candidate_name'],
-                'application_id': state_data['application_id'],
-                'vacancy_id': state_data['vacancy_id'],
-                'vacancy_title': state_data['vacancy_title'],
-                'questions': [q.id for q in questions],
-                'answers': {},
-                'current_question': 0,
-                'resumed': False
-            }
-            
-            interaction.state = InteractionState.STARTED
-            interaction.current_question_id = questions[0].id
-            db.commit()
-            
-            # Отправляем приветственное сообщение и начинаем показ вопросов
-            await state.set_data(new_state_data)
-            await message.answer(
-                msg_templates.get_candidate_on_start_bot_interaction_message(
-                    db_candidate_full_name=interaction.candidate.full_name,
-                    vacancy_title=interaction.vacancy.title,
-                    questions_length=len(questions)),
-                parse_mode="Markdown",
-                reply_markup=ReplyKeyboardRemove()
-            )
-            await _show_question(questions[0], message, state)
-            await state.set_state(CandidateStates.answering)
-            
+                await _show_question(questions[0], message, state)
+                await state.set_state(CandidateStates.answering)
+            else:
+                # При несогласии с обработкой, даем пользователю ещё один шанс
+                if state_data.get('consent_retry', False):
+                    interaction.completed_at = now
+                    interaction.state = InteractionState.NO_CONSENT
+                    db.commit()
+                    await message.answer(
+                        msg_templates.CANDIDATE_CONSENT_DECLINED_THANKYOU,
+                        reply_markup=ReplyKeyboardRemove(),
+                        parse_mode="Markdown"
+                    )
+                    await state.clear()
+                    return
+                else:
+                    await state.update_data(consent_retry=True)
+                    await message.answer(
+                        msg_templates.CANDIDATE_CONSENT_RETRY,
+                        reply_markup=CONSENT_KEYBOARD,
+                        parse_mode="Markdown"
+                    )
+                    
     except Exception as e:
         logger.error(f"Consent handling error: {str(e)}")
         await handle_db_error(message)
