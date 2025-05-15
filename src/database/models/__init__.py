@@ -17,6 +17,8 @@ from .candidate_skill import CandidateSkill
 from .hr_specialist import HrSpecialist
 from .registration_token import RegistrationToken
 from .vacancy import Vacancy
+from .resume_criteria_field import ResumeCriteriaField
+from .resume_screening_criteria import ResumeScreeningCriteria
 # from .candidate_answer import CandidateAnswer
 
 
@@ -42,4 +44,6 @@ __all__ = [
     "HrSpecialist",
     "RegistrationToken",
     "Vacancy",
+    "ResumeCriteriaField",
+    "ResumeScreeningCriteria",
 ]
