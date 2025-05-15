@@ -25,33 +25,6 @@ class TelegramScreening:
         # Инициализируем GigaChat клиент
         self.giga = get_gigachat_client()
         
-    def _format_criteria(self, criteria):
-        """
-        Форматировать скрининговые критерии в читаемый вид
-        
-        Args:
-            criteria (dict): Словарь критериев
-        
-        Example:
-            criteria = 
-            {
-                'навыки_коммуникации': 'Ясные и четкие ответы',
-                'технические_познания': 'Продемонстрированы навыки решения проблем'
-            } 
-            
-            result -> criteria_text = (
-                    - Навыки Коммуникации: Ясные и четкие ответы
-                    - Технические Познания: Продемонстрированы навыки решения проблем
-                )
-
-        Returns:
-            str: Текст форматированных критериев
-        """
-        criteria_text = ""
-        for key, value in criteria.items():
-            criteria_text += f"- {key.replace('_', ' ').title()}: {value}\n"
-        return criteria_text
-    
     def _collect_tasks(
         self, 
         candidate_responses_json: str,
@@ -90,8 +63,7 @@ class TelegramScreening:
     async def screen_answers(
         self, 
         candidate_responses_json: str,
-        vacancy_id: int,
-        screening_criterias: str = None
+        vacancy_id: int
     ) -> str:
         """
         Провести дополнительную оценку кандидата по его ответам из Telegram бота
@@ -104,8 +76,6 @@ class TelegramScreening:
         Returns:
             str: Финальная оценка от GigaChat по кандидату
         """
-        # criteria_text = self._format_criteria(screening_criterias) if screening_criterias else ""
-
         # Общая оценка
         global_score = 0
         

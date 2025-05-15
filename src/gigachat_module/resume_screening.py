@@ -122,7 +122,6 @@ class ResumeScreening:
         Returns:
             int: Оценка от GigaChat относительно резюме
         """
-        
         # Общая оценка
         global_score = 0
         
