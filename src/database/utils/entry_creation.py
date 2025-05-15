@@ -1,6 +1,6 @@
 import logging
 
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Tuple
 from datetime import datetime, timezone, date
 from sqlalchemy.orm import Session as SqlAlchemySession
 
@@ -19,18 +19,28 @@ from src.gigachat_module.parser import ResumeData
 logger = logging.getLogger(__name__)
 
 
-async def create_candidates_entries(resumes: List[Optional[ResumeData]]) -> Optional[List[int]]:
-    '''Создать записи в базе данных для списка кандидатов, по данным с резюме'''
+async def create_candidates_entries(resumes: List[Optional[ResumeData]]) -> List[Tuple[ResumeData, int]]:
+    '''
+    Создать записи в базе данных для списка кандидатов, 
+    по данным с резюме и вернуть замапленные (resume_data, id) пары
+    
+    Args:
+        resumes: Список ResumeData (может содержать None значения)
+    
+    Returns:
+        Список кортежей, содержащих (resume_data_info, created_resume_id) для успешно созданных объектов в БД
+    '''
     try:
-        ids = []
+        resume_data_to_ids = []
         with Session() as db:
             for resume_data in filter(None, resumes):
                 resume_id = await _process_single_resume(db, resume_data)
                 if resume_id:
-                    ids.append(resume_id)
-            return ids
+                    resume_data_to_ids.append((resume_data, resume_id))
+            return resume_data_to_ids
     except Exception as e:
         logger.error(f'Error in create_candidate_entry: {str(e)}')
+        return []
 
 
 async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData) -> int:
