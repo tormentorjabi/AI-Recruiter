@@ -94,11 +94,13 @@ async def resumes_processing_task(delay_hours: int = 24) -> None:
             for resume_data, resume_id in created_entries:
                 try:
                     # Отправляем данные о резюме на скрининг GigaChat
-                    resume_screening_score = await resume_screener.screen_resume(resume_data=resume_data)
+                    # TODO: в работе
+                    #resume_screening_score = await resume_screener.screen_resume(resume_data=resume_data)
                     # Обновляем сущности в базе данных
                     await update_candidate_entry_resume_score(
                         resume_id=resume_id, 
-                        score=resume_screening_score
+                        score=1
+                        #score=resume_screening_score
                     )
                 except Exception as e:
                     logger.error(f'Failed to process resume {resume_data}: {str(e)}')
