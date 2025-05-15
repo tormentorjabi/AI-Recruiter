@@ -394,6 +394,21 @@ async def _show_vacancy_detail(callback: CallbackQuery):
                     text=msg_templates.EDIT_VACANCY_PARAMS,
                     callback_data=f"edit_vacancy_params_{vacancy_id}"
                 )],
+                
+                [InlineKeyboardButton(
+                    text=msg_templates.EMPTY_BUTTON,
+                    callback_data=f"noop"
+                )],
+                # TODO: Implement
+                [InlineKeyboardButton(
+                    text=msg_templates.VIEW_RESUME_SCREENING_PARAMS,
+                    callback_data=f"noop"
+                )],
+                # TODO: Implement
+                [InlineKeyboardButton(
+                    text=msg_templates.EDIT_RESUME_SCREENING_PARAMS,
+                    callback_data=f"noop"
+                )],
 
                 [InlineKeyboardButton(
                     text=msg_templates.BACK_TO_LIST,

@@ -50,6 +50,7 @@ class ResumeScreening:
     
     def _build_prompt(self, template: str, field_value: Any, resume_data: ResumeData) -> str:
         # TODO: Нужно придумать как собирать данные с ResumeData и объединять их с критерием template
+        # Отказаться от ResumeData? Собираем данные в БД же.
         pass
   
     async def screen_resume(self, resume_data: ResumeData, vacancy_id: int) -> int:
