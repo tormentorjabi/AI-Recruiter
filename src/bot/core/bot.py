@@ -14,7 +14,7 @@ from src.bot.handlers.hr_commands import hr_commands_router
 from src.bot.handlers.candidate_commands import candidate_router
 
 # Тестовые роутеры
-from tests.tests_commands import tests_router
+from ....tests.tests_commands import tests_router
 
 
 load_dotenv()
