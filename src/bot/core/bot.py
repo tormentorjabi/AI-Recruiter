@@ -17,7 +17,7 @@ from src.bot.handlers.candidate_commands import candidate_router
 from tests.tests_commands import tests_router
 
 
-load_dotenv('deploy\.env')
+load_dotenv()
 
 mongo_url = os.environ.get('MONGO_DB_CONNECTION')
 
