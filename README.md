@@ -51,10 +51,6 @@
 
 ## Структура
 
-### Развертывание
-
-`deploy` - развертывание
-
 ### Telegram-бот
 
 `src/bot` - модуль Telegram-бота
@@ -96,3 +92,7 @@
 `requirements.txt` - зависимости Python
 
 `alembic.ini` - конфигурация Alembic
+
+`Dockerfile`
+
+`docker-compose.yml`
