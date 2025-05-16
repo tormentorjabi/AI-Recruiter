@@ -57,7 +57,7 @@ def fetch_new_resumes_data() -> Optional[List[Tuple[str, int]]]:
     
     test_return_data = [
         ("https://nizhny-tagil.hh.ru/resume/27597eb2ff0e7799050039ed1f494d63716948", test_vacancy_id_1),
-        #("https://ekaterinburg.hh.ru/resume/0343600aff0c1b1b130039ed1f4a7a6e7a494c", test_vacancy_id_1) 
+        ("https://hh.ru/resume/0343600aff0c1b1b130039ed1f4a7a6e7a494c", test_vacancy_id_1) 
     ]
     
     return test_return_data
