@@ -15,7 +15,7 @@ from src.database.models import (
 
 from src.database.models.application import ApplicationStatus
 
-from tests.bot_questions_data import QUESTION_DATA
+from .bot_questions_data import QUESTION_DATA
 
 from src.database.utils.generate_application_token import set_application_token
 
