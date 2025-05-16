@@ -119,7 +119,7 @@ def _create_application(db: SqlAlchemySession, resume_data: ResumeData, candidat
     return application
 
 
-def _handle_application_token(db: SqlAlchemySession, application_id: int) -> None:
+def _handle_application_token(db: SqlAlchemySession, application_id: int) -> str:
     '''Генерация и установка токена идентификации кандидата'''
     # TODO:
     # - После генерации токена, его нужно проверить на успешную
@@ -135,25 +135,37 @@ def _handle_application_token(db: SqlAlchemySession, application_id: int) -> Non
 async def _create_resume(db: SqlAlchemySession, resume_data: ResumeData, candidate_id: int, application_id: int) -> Resume:
     '''Создание и наполнение Resume модели'''
     try:
+        existing_resume = db.query(Resume).join(Application).filter(
+            Resume.resume_link == resume_data.link,
+            Application.vacancy_id == resume_data.vacancy_id
+        ).first()
+        
+        if existing_resume:
+            logger.info(f"Duplicate resume found for candidate {candidate_id}, vacancy {resume_data.vacancy_id}")
+            return None
         resume_entry = db.query(Resume).filter_by(
             resume_link=resume_data.link
         ).first()
-        if resume_entry and resume_entry.application.vacancy.id == resume_data.vacancy_id:
-            return
     except Exception as e:
-        logger.error(f'Error while trying to find duplicate resume: {str(e)}')
+        logger.error(f'Error checking for duplicate resume: {str(e)}')
+        return None
     
-    now = datetime.now(timezone.utc)
-    resume = Resume(
-        candidate_id=candidate_id,
-        application_id=application_id,
-        resume_link=resume_data.link,
-        created_at=now,
-        updated_at=now
-    )
-    db.add(resume)
-    db.flush()
-    return resume
+    try:
+        now = datetime.now(timezone.utc)
+        resume = Resume(
+            candidate_id=candidate_id,
+            application_id=application_id,
+            resume_link=resume_data.link,
+            created_at=now,
+            updated_at=now
+        )
+        db.add(resume)
+        db.flush()
+        return resume
+    except Exception as e:
+        logger.error(f'Error creating resume: {str(e)}')
+        db.rollback()
+        return None
 
 
 def _create_desired_position(db: SqlAlchemySession, resume_data: ResumeData, resume_id: int) -> int:
