@@ -41,4 +41,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=development
 
-CMD ["python", "-m", "src.main"]
+CMD ["sh", "-c", "alembic upgrade head && python -m src.main"]
