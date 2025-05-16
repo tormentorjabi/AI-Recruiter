@@ -99,7 +99,7 @@ async def _generate_token(message: Message):
 
 
 @admin_router.message(
-    Command('list_hr'),
+    Command('list_hrs'),
     F.chat.id == ADMIN_CHANNEL_ID,
     F.from_user.id == ADMIN_USER_ID
 )

@@ -8,7 +8,7 @@ from datetime import date
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from dataclasses import dataclass
-from typing import Optional, List, Union, Tuple
+from typing import Optional, List, Tuple
 
 
 logger = logging.getLogger(__name__)
