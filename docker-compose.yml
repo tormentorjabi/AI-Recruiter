@@ -1,8 +1,8 @@
 services:
   app:
     build:
-      context: ../..
-      dockerfile: deploy/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: recruiter-bot
     restart: unless-stopped
     depends_on:
