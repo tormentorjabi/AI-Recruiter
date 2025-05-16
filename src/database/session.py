@@ -18,8 +18,8 @@ DB_URL = f'{DB_DRIVER}://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}'
 
 engine = create_engine(
     DB_URL,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=10,
+    max_overflow=20,
     echo=False
 )
 
