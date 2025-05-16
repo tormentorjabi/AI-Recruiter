@@ -17,7 +17,7 @@ from src.bot.handlers.candidate_commands import candidate_router
 from tests.tests_commands import tests_router
 
 
-load_dotenv()
+load_dotenv('deploy\.env')
 
 mongo_url = os.environ.get('MONGO_DB_CONNECTION')
 
@@ -27,8 +27,10 @@ dp = Dispatcher(storage=memory)
 # Регистрируем роутеры.
 # Внимание! 
 # Порядок регистрации роутеров имеет значение
+if os.getenv('ENVIRONMENT') == 'development':
+    dp.include_router(tests_router)
+    
 dp.include_routers(
-    tests_router,
     admin_router,
     admin_screening,
     candidate_router,

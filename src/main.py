@@ -1,3 +1,4 @@
+import os
 import asyncio
 import logging
 import signal
@@ -71,12 +72,16 @@ async def main() -> None:
                 BotCommand(command='/generate_token', description='Генерация токена регистрации (для Админа)'),
                 BotCommand(command='/delete_hr', description='Удаление HR-специалиста (для Админа)'),
                 BotCommand(command='/list_hrs', description='Список зарегистрированых HR-специалистов (для Админа)'),
-                # [DEV MODE ONLY] commands
-                BotCommand(command='/clr_db', description='Очистить БД (DEV MODE ONLY)'),
-                BotCommand(command='/vacancies_test', description='Тест: Создание вакансий (DEV MODE ONLY)'),
-                BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
-                BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
             ]
+            
+            if os.getenv('ENVIRONMENT') == 'development':
+                commands.extend([
+                    # [DEV MODE ONLY] commands
+                    BotCommand(command='/clr_db', description='Очистить БД (DEV MODE ONLY)'),
+                    BotCommand(command='/vacancies_test', description='Тест: Создание вакансий (DEV MODE ONLY)'),
+                    BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
+                    BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
+                ])
             
             '''
                 Сборка основных корутин приложения:
