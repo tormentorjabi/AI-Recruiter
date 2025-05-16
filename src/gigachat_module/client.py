@@ -10,7 +10,7 @@ load_dotenv()
 SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
 AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY")
 MODEL = os.getenv("GIGACHAT_MODEL","")
-CERTIFICATE_BUNDLE_FILE = os.getenv("CA_BUNDLE_FILE","")
+# CERTIFICATE_BUNDLE_FILE = os.getenv("CA_BUNDLE_FILE","")
 
 
 def get_gigachat_client() -> GigaChat:
@@ -24,7 +24,7 @@ def get_gigachat_client() -> GigaChat:
         if not AUTH_KEY:
             raise ValueError("GigaChat credentials not found in environmental variables.")
         
-        giga =  GigaChat(
+        giga = GigaChat(
             credentials=AUTH_KEY,
             model=MODEL,
             scope=SCOPE,
