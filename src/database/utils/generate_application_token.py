@@ -4,7 +4,6 @@ import logging
 from sqlalchemy.orm import Session as SqlAlchemySession
 from datetime import datetime, timedelta, timezone
 
-from src.database.session import Session
 from src.database.models import Application
 
 logger = logging.getLogger(__name__)
