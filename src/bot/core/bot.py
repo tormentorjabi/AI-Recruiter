@@ -13,9 +13,6 @@ from src.bot.handlers.hr_registration import hr_registration_router
 from src.bot.handlers.hr_commands import hr_commands_router
 from src.bot.handlers.candidate_commands import candidate_router
 
-# Тестовые роутеры
-from ....tests.tests_commands import tests_router
-
 
 load_dotenv()
 
@@ -28,7 +25,11 @@ dp = Dispatcher(storage=memory)
 # Внимание! 
 # Порядок регистрации роутеров имеет значение
 if os.getenv('ENVIRONMENT') == 'development':
-    dp.include_router(tests_router)
+    try:
+        from tests.tests_commands import tests_router
+        dp.include_router(tests_router)
+    except ImportError:
+        pass
     
 dp.include_routers(
     admin_router,

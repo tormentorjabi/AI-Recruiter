@@ -41,4 +41,6 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=development
 
+COPY tests/ ./tests/
+
 CMD ["sh", "-c", "alembic upgrade head && python -m src.main"]
