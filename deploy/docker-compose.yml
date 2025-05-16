@@ -1,1 +1,62 @@
-version: '3.9'
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile
+    container_name: recruiter-bot
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # GigaChat
+      - GIGACHAT_SCOPE=${GIGACHAT_SCOPE}
+      - GIGACHAT_MODEL=${GIGACHAT_MODEL}
+      - GIGACHAT_AUTH_KEY=${GIGACHAT_AUTH_KEY}
+      - GIGACHAT_CLIENT_ID=${GIGACHAT_CLIENT_ID}
+      - GIGACHAT_SECRET=${GIGACHAT_SECRET}
+      
+      # Telegram
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_CHANNEL_ID=${ADMIN_CHANNEL_ID}
+      - ADMIN_USER_ID=${ADMIN_USER_ID}
+      
+      # PostgreSQL
+      - DB_DRIVER=postgresql
+      - DB_USER=recruiter
+      - DB_NAME=recruiter_db
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      
+      # MongoDB
+      - MONGO_DB_CONNECTION=${MONGO_DB_CONNECTION}
+      
+      # Other
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import requests; requests.get('http://localhost:8000/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:13-alpine
+    container_name: recruiter-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=recruiter
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=recruiter_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recruiter -d recruiter_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
