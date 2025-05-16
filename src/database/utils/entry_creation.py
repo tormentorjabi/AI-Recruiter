@@ -1,6 +1,9 @@
 import logging
+import os
 
-from typing import List, Optional, Any
+from aiogram import Bot
+from dotenv import load_dotenv
+from typing import List, Optional, Any, Tuple
 from datetime import datetime, timezone, date
 from sqlalchemy.orm import Session as SqlAlchemySession
 
@@ -15,31 +18,47 @@ from src.database.utils.generate_application_token import set_application_token
 
 from src.gigachat_module.parser import ResumeData
 
-
+load_dotenv()
+ADMIN_CHANNEL_ID = int(os.environ.get("ADMIN_CHANNEL_ID"))
 logger = logging.getLogger(__name__)
 
 
-async def create_candidates_entries(resumes: List[Optional[ResumeData]]) -> Optional[List[int]]:
-    '''Создать записи в базе данных для списка кандидатов, по данным с резюме'''
+async def create_candidates_entries(bot: Bot, resumes: List[Optional[ResumeData]]) -> List[Tuple[ResumeData, int]]:
+    '''
+    Создать записи в базе данных для списка кандидатов, 
+    по данным с резюме и вернуть замапленные (resume_data, id) пары
+    
+    Args:
+        resumes: Список ResumeData (может содержать None значения)
+    
+    Returns:
+        Список кортежей, содержащих (resume_data_info, created_resume_id) для успешно созданных объектов в БД
+    '''
     try:
-        ids = []
+        resume_data_to_ids = []
         with Session() as db:
             for resume_data in filter(None, resumes):
-                resume_id = await _process_single_resume(db, resume_data)
+                resume_id = await _process_single_resume(bot, db, resume_data)
                 if resume_id:
-                    ids.append(resume_id)
-            return ids
+                    resume_data_to_ids.append((resume_data, resume_id))
+            return resume_data_to_ids
     except Exception as e:
         logger.error(f'Error in create_candidate_entry: {str(e)}')
+        return []
 
 
-async def _process_single_resume(db: SqlAlchemySession, resume_data: ResumeData) -> int:
+async def _process_single_resume(bot: Bot, db: SqlAlchemySession, resume_data: ResumeData) -> int:
     '''Процессинг единичного резюме с созданием всех необходимых моделей'''
     candidate = _create_candidate(db, resume_data)
     application = _create_application(db, resume_data, candidate.id)
     # TODO: Переделать
     t = _handle_application_token(db, application.id)
-    logger.warning(f'Готовый для отправки кандидату - {candidate.full_name} токен: {t}')
+
+    await bot.send_message(
+        chat_id=ADMIN_CHANNEL_ID,
+        text=f'*Токен для кандидата - {candidate.full_name}:*\n\n🤖 `{t}`',
+        parse_mode="Markdown"
+    )
     
     resume = await _create_resume(db, resume_data, candidate.id, application.id)
     if not resume:
@@ -189,7 +208,7 @@ def _handle_employment_data(
 async def _process_skills(db: SqlAlchemySession, skills: List[str], resume_id: int) -> None:
     '''Создание и наполнение CandidateSkills модели'''
     for skill in skills:
-        skill_id = await _create_or_match_skill(skill)
+        skill_id = await _create_or_match_skill(db, skill)
         if skill_id:
             db.add(CandidateSkill(
                 resume_id=resume_id,
@@ -214,22 +233,21 @@ def _process_experiences(db: SqlAlchemySession, experiences: List[Any], resume_i
     db.add_all(work_experiences)
 
 
-async def _create_or_match_skill(skill: Optional[str]) -> Optional[int]:
+async def _create_or_match_skill(db: SqlAlchemySession, skill: Optional[str]) -> Optional[int]:
     '''Найти существующий Skill в базе данных или создать новый вид'''
     if not skill:
         return None
     
     try:
-        with Session() as db:
-            skill_entry = db.query(Skill).filter(Skill.skill_name == skill).first()
-            
-            if skill_entry:
-                return skill_entry.id
-            
-            new_skill = Skill(skill_name=skill)
-            db.add(new_skill)
-            db.flush()
-            return new_skill.id
+        skill_entry = db.query(Skill).filter(Skill.skill_name == skill).first()
+        
+        if skill_entry:
+            return skill_entry.id
+        
+        new_skill = Skill(skill_name=skill)
+        db.add(new_skill)
+        db.flush()
+        return new_skill.id
         
     except Exception as e:
         logger.error(f'Error in _create_or_match_skill: {e}')

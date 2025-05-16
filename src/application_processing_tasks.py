@@ -1,7 +1,8 @@
 import logging
 import asyncio
 
-from typing import Tuple, List
+from aiogram import Bot
+from typing import Tuple, List, Optional
 from datetime import timezone, datetime
 
 from src.gigachat_module.resume_screening import ResumeScreening
@@ -17,7 +18,7 @@ from tests.bot_questions_data import QUESTION_DATA
 logger = logging.getLogger(__name__)
 resume_screener = ResumeScreening()
 
-def fetch_new_resumes_data() -> List[Tuple[str, int]]:
+def fetch_new_resumes_data() -> Optional[List[Tuple[str, int]]]:
     '''
         TODO:
             - Возвращать список URL+вакансия(+ её создание)
@@ -56,13 +57,13 @@ def fetch_new_resumes_data() -> List[Tuple[str, int]]:
     
     test_return_data = [
         ("https://nizhny-tagil.hh.ru/resume/27597eb2ff0e7799050039ed1f494d63716948", test_vacancy_id_1),
-        ("https://ekaterinburg.hh.ru/resume/0343600aff0c1b1b130039ed1f4a7a6e7a494c", test_vacancy_id_1) 
+        #("https://ekaterinburg.hh.ru/resume/0343600aff0c1b1b130039ed1f4a7a6e7a494c", test_vacancy_id_1) 
     ]
     
     return test_return_data
 
 
-async def resumes_processing_task(delay_hours: int = 24) -> None:
+async def resumes_processing_task(bot: Bot, delay_hours: int = 24) -> None:
     while True:
         try:
             '''
@@ -75,13 +76,16 @@ async def resumes_processing_task(delay_hours: int = 24) -> None:
             resumes_data = fetch_new_resumes_data()
             # Парсим информацию по ссылкам на резюме              
             parsed_results = await parse_multiple_resumes(resumes_data=resumes_data)
-            # Заполняем базу данных необходимыми сущностями
-            created_resume_ids = await create_candidates_entries(resumes=parsed_results)
-            if not created_resume_ids:
-                logger.error(f'No resume IDs were created. Skipping updates')
+            if all(item is None for item in parsed_results):
+                logger.error(f'Resume parsing returned no info. Skipping updates')
                 return
+            
+            # Заполняем базу данных необходимыми сущностями
+            created_entries = await create_candidates_entries(bot=bot, resumes=parsed_results)
+            if not created_entries:
+                logger.error(f'No resume entries were created. Skipping updates')
 
-            for resume_data, resume_id in zip(parsed_results, created_resume_ids):
+            for resume_data, resume_id in created_entries:
                 try:
                     # Отправляем данные о резюме на скрининг GigaChat
                     resume_screening_score = await resume_screener.screen_resume(resume_data=resume_data)
