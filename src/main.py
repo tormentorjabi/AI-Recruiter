@@ -78,7 +78,7 @@ async def main() -> None:
                 commands.extend([
                     # [DEV MODE ONLY] commands
                     BotCommand(command='/send', description='Загрузить резюме по вакансии в систему (DEV MODE ONLY)'),
-                    BotCommand(command='/clr_db', description='Очистить БД (DEV MODE ONLY)'),
+                    BotCommand(command='/restart', description='Очистить БД и перезапуститься (DEV MODE ONLY)'),
                     BotCommand(command='/vacancies_test', description='Тест: Создание вакансий (DEV MODE ONLY)'),
                     BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
                     BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),

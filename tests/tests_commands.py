@@ -18,6 +18,7 @@ from src.database.models.application import ApplicationStatus
 from .bot_questions_data import QUESTION_DATA
 
 from src.database.utils.generate_application_token import set_application_token
+from src.application_processing_tasks import create_test_vacancy_task
 
 logger = logging.getLogger(__name__)
 tests_router = Router()
@@ -68,7 +69,7 @@ async def create_vacancies(message: Message):
         logger.error(f'Error in create_vacancies: {str(e)}')
 
 
-@tests_router.message(Command('clr_db'))
+@tests_router.message(Command('restart'))
 async def truncate_database(message: Message):
     try:
         await message.answer(
@@ -78,10 +79,6 @@ async def truncate_database(message: Message):
             parse_mode='Markdown'
         )
         with Session() as db:
-            await message.answer(
-                "❗️ВЫПОЛНЯЕМ ОЧИСТКУ БД...❗️\n"
-            )
-            
             query = (
             "TRUNCATE applications, candidates, vacancies, "
             "bot_questions, bot_interactions, hr_notifications, hr_specialists, resumes CASCADE"
@@ -93,7 +90,7 @@ async def truncate_database(message: Message):
             await message.answer(
                 "❗️ОЧИСТКА БД УСПЕШНА❗️"
             )
-        
+        await create_test_vacancy_task()
     except Exception as e:
         logger.error(f'Error in clear_database: {str(e)}')
 
