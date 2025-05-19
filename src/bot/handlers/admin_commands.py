@@ -15,6 +15,14 @@ from src.bot.config import ADMIN_CHANNEL_ID, ADMIN_USER_ID
 from src.bot.utils.error_handlers import handle_db_error
 
 
+# DEV MODE ONLY IMPORTS
+from aiogram.filters import CommandObject
+from src.application_processing_tasks import resumes_processing_task
+from src.database.models import Vacancy
+from urllib.parse import urlparse
+# END OF DEV MODE IMPORTS
+
+
 logger = logging.getLogger(__name__)
 admin_router = Router()
 
@@ -26,6 +34,68 @@ class DeleteHRStates(StatesGroup):
 #---------------
 # Init Handlers
 #---------------
+
+# DEV MODE COMMAND
+@admin_router.message(
+    Command('send'),
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
+)
+async def _send_resume(message: Message, command: CommandObject):
+    try:
+        command_args: str = command.args
+        if not command_args:
+            await message.answer(
+                msg_templates.SHOW_SEND_COMMAND_HELPER,
+                parse_mode="Markdown"
+            )
+            return
+        
+        parts = command_args.strip().split()
+        if len(parts) < 2:
+            await message.answer(
+                msg_templates.SHOW_SEND_COMMAND_HELPER,
+                parse_mode="Markdown"
+            )
+            return
+        
+        vacancy_title = ' '.join(parts[:-1])
+        resume_url = parts[-1]
+        
+        validate_url = urlparse(resume_url)
+        if all([validate_url.scheme, validate_url.netloc]) == False:
+            await message.answer(
+                text="⚠️ *Введен некорректный URL*",
+                parse_mode="Markdown"
+            )
+            return
+        
+        vacancy_id: int = 0
+        
+        with Session() as db:
+            vacancy = db.query(Vacancy).filter_by(
+                title=vacancy_title
+            ).first()
+            
+            if not vacancy:
+                await message.answer(
+                    msg_templates.VACANCY_NOT_FOUND,
+                    parse_mode="Markdown"
+                )
+                return
+            vacancy_id = vacancy.id
+        
+        await resumes_processing_task(
+            bot=message.bot,
+            resumes_data=[
+                (resume_url, vacancy_id)
+            ]
+        )
+    except Exception as e:
+        logger.error(f'Error in send_resume: {str(e)}')
+        await handle_db_error(message)
+            
+
 @admin_router.message(
     Command('start'),
     F.chat.id == ADMIN_CHANNEL_ID,
