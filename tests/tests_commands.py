@@ -1,7 +1,7 @@
 import logging
 import random
 
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
 from datetime import datetime, timezone
@@ -16,6 +16,7 @@ from src.database.models import (
 from src.database.models.application import ApplicationStatus
 
 from .bot_questions_data import QUESTION_DATA
+from src.bot.config import ADMIN_CHANNEL_ID, ADMIN_USER_ID
 
 from src.database.utils.generate_application_token import set_application_token
 from src.application_processing_tasks import create_test_vacancy_task
@@ -31,7 +32,11 @@ def generate_random_score() -> int:
             return random_number
 
 
-@tests_router.message(Command('vacancies_test'))
+@tests_router.message(
+    Command('vacancies_test'),
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
+)
 async def create_vacancies(message: Message):
     try:
         args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
@@ -69,7 +74,11 @@ async def create_vacancies(message: Message):
         logger.error(f'Error in create_vacancies: {str(e)}')
 
 
-@tests_router.message(Command('restart'))
+@tests_router.message(
+    Command('restart'),
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
+)
 async def truncate_database(message: Message):
     try:
         await message.answer(
@@ -95,7 +104,11 @@ async def truncate_database(message: Message):
         logger.error(f'Error in clear_database: {str(e)}')
 
 
-@tests_router.message(Command('token_test'))
+@tests_router.message(
+    Command('token_test'),
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
+)
 async def populate_database_and_generate_candidate_token_test(message: Message):
     try:
         await truncate_database(message)
@@ -170,7 +183,11 @@ async def populate_database_and_generate_candidate_token_test(message: Message):
         logger.error(f'Error in populate_database_test: {str(e)}')
         
 
-@tests_router.message(Command('notification_test'))
+@tests_router.message(
+    Command('notification_test'),
+    F.chat.id == ADMIN_CHANNEL_ID,
+    F.from_user.id == ADMIN_USER_ID
+)
 async def create_notifications(message: Message):
     try:
         args = message.text.split(maxsplit=1)[1:] if len(message.text.split()) > 1 else []
