@@ -18,12 +18,7 @@ from tests.bot_questions_data import QUESTION_DATA
 logger = logging.getLogger(__name__)
 resume_screener = ResumeScreening()
 
-def fetch_new_resumes_data() -> Optional[List[Tuple[str, int]]]:
-    '''
-        TODO:
-            - Возвращать список URL+вакансия(+ её создание)
-    '''
-    
+async def create_test_vacancy_task() -> None:
     # [DEV MODE ONLY]
     with Session() as db:
         try:
@@ -55,16 +50,16 @@ def fetch_new_resumes_data() -> Optional[List[Tuple[str, int]]]:
             logger.error(f"COULDNT CREATE VACANCY: {str(e)}")
             return
     
-    test_return_data = [
-        ("https://nizhny-tagil.hh.ru/resume/27597eb2ff0e7799050039ed1f494d63716948", test_vacancy_id_1),
-        ("https://hh.ru/resume/0343600aff0c1b1b130039ed1f4a7a6e7a494c", test_vacancy_id_1) 
-    ]
+    # test_return_data = [
+    #     ("https://nizhny-tagil.hh.ru/resume/27597eb2ff0e7799050039ed1f494d63716948", test_vacancy_id_1),
+    #     ("https://hh.ru/resume/0343600aff0c1b1b130039ed1f4a7a6e7a494c", test_vacancy_id_1) 
+    # ]
     
-    return test_return_data
+    # return test_return_data
 
 
-async def resumes_processing_task(bot: Bot, delay_hours: int = 24) -> None:
-    while True:
+async def resumes_processing_task(bot: Bot, resumes_data: Optional[List[Tuple[str, int]]],  delay_hours: int = 24) -> None:
+    #while True:
         try:
             '''
                 TODO:
@@ -73,9 +68,14 @@ async def resumes_processing_task(bot: Bot, delay_hours: int = 24) -> None:
                 кидать HR'у, что как бы хрень какая-то.
             '''
             # Получаем новые ссылки на резюме
-            resumes_data = fetch_new_resumes_data()
+            # resumes_data = create_test_vacancy_task()
+            if not resumes_data:
+                logger.error(f'No resumes_data were provided')
+                return
+            
             # Парсим информацию по ссылкам на резюме              
             parsed_results = await parse_multiple_resumes(resumes_data=resumes_data)
+            
             if all(item is None for item in parsed_results):
                 logger.error(f'Resume parsing returned no info. Skipping updates')
                 return
@@ -100,4 +100,4 @@ async def resumes_processing_task(bot: Bot, delay_hours: int = 24) -> None:
         except Exception as e:
             logger.error(f'Error in resume_processing_task: {str(e)}', exc_info=True)
             
-        await asyncio.sleep(3600 * delay_hours)
+        #await asyncio.sleep(3600 * delay_hours)

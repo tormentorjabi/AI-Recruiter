@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from src.bot.core.bot import bot, dp
 from src.bot.utils.check_abandoned_forms import check_abandoned_forms
-from src.application_processing_tasks import resumes_processing_task
+from src.application_processing_tasks import create_test_vacancy_task
 
 
 logging.basicConfig(
@@ -77,6 +77,7 @@ async def main() -> None:
             if os.getenv('ENVIRONMENT') == 'development':
                 commands.extend([
                     # [DEV MODE ONLY] commands
+                    BotCommand(command='/send', description='Загрузить резюме по вакансии в систему (DEV MODE ONLY)'),
                     BotCommand(command='/clr_db', description='Очистить БД (DEV MODE ONLY)'),
                     BotCommand(command='/vacancies_test', description='Тест: Создание вакансий (DEV MODE ONLY)'),
                     BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
@@ -93,7 +94,11 @@ async def main() -> None:
             ''' 
             
             tasks = [
-                asyncio.create_task(resumes_processing_task(bot=bot, delay_hours=24)),
+                # DEV MODE ONLY [Обход HH API]
+                asyncio.create_task(create_test_vacancy_task()),
+                #asyncio.create_task(resumes_processing_task(bot=bot, delay_hours=24)),
+                
+                # Production tasks
                 asyncio.create_task(bot.set_my_commands(commands=commands)),
                 asyncio.create_task(dp.start_polling(bot)),
                 asyncio.create_task(check_abandoned_forms(bot=bot, delay_minutes=30)),
