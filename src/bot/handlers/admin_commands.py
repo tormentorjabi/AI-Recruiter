@@ -37,9 +37,7 @@ class DeleteHRStates(StatesGroup):
 
 # DEV MODE COMMAND
 @admin_router.message(
-    Command('send'),
-    F.chat.id == ADMIN_CHANNEL_ID,
-    F.from_user.id == ADMIN_USER_ID
+    Command('send')
 )
 async def _send_resume(message: Message, command: CommandObject):
     try:
@@ -70,6 +68,13 @@ async def _send_resume(message: Message, command: CommandObject):
             )
             return
         
+        if not ('hh.ru/resume/' in resume_url):
+            await message.answer(
+                text="⚠️ *Только ссылки на резюме с HH.ru*",
+                parse_mode="Markdown"
+            )
+            return
+            
         vacancy_id: int = 0
         
         with Session() as db:
