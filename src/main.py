@@ -40,7 +40,6 @@ async def shutdown(signal, loop):
 
 @asynccontextmanager
 async def lifespan():
-    """Cross-platform lifespan management"""
     try:
         if platform.system() != 'Windows':
             loop = asyncio.get_running_loop()

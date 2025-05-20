@@ -97,7 +97,7 @@ async def truncate_database(message: Message):
             db.commit()
             
             await message.answer(
-                "❗️ОЧИСТКА БД УСПЕШНА❗️"
+                "✅"
             )
         await create_test_vacancy_task()
     except Exception as e:
