@@ -33,6 +33,7 @@ services:
       
       # Other
       - PYTHONUNBUFFERED=1
+      - LOG_PATH=/app/logs/bot.log
     volumes:
       - ./logs:/app/logs
     healthcheck:

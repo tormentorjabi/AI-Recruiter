@@ -18,7 +18,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('bot.log')
+        logging.FileHandler(os.getenv('LOG_PATH', '/app/logs/bot.log'))
     ]
 )
 logger = logging.getLogger(__name__)
