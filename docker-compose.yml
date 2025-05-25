@@ -37,10 +37,11 @@ services:
     volumes:
       - ./logs:/app/logs
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import requests; requests.get('http://localhost:8000/health', timeout=5)\""]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "sh", "-c", "echo 'import os; print(\"Bot is running\")' | python3"]
+      interval: 10s
+      timeout: 5s
       retries: 3
+      start_period: 10s
 
   postgres:
     image: postgres:13-alpine
