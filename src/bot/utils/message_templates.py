@@ -203,7 +203,9 @@ def show_admin_helper_message(admin_name: str) -> str:
     
 SHOW_SEND_COMMAND_HELPER = (
     "❌ Использование: */send <вакансия> <url резюме>*\n\n"
-    "Пример:\n*/send Оператор https://hh.ru/resume/1234567890abcdefg*"
+    "Пример:\n*/send Оператор https://hh.ru/resume/1234567890abcdefg*\n\n"
+    "🗄 Доступные вакансии для тестирования:\n"
+    "`/send Оператор контактного центра` *<url вашего резюме>*"
 )  
   
     
