@@ -14,7 +14,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
 from src.database.session import Session
-from src.database.models import Vacancy, Application, BotQuestion
+from src.database.models import Vacancy, Application, BotQuestion, HrSpecialist
 from src.database.models.bot_question import AnswerFormat
 from src.database.models.application import ApplicationStatus
 from src.bot.config import ADMIN_CHANNEL_ID, ADMIN_USER_ID
@@ -167,11 +167,23 @@ async def _handle_vacancies_pagination(callback: CallbackQuery):
 @admin_screening.message(
     Command('list_vacancies'),
     F.chat.id == ADMIN_CHANNEL_ID,
-    F.from_user.id == ADMIN_USER_ID
+#    F.from_user.id == ADMIN_USER_ID
 )
 async def _list_vacancies(message: Message):
     try:
         with Session() as db:
+            admin_hr = db.query(HrSpecialist).filter_by(
+                    is_approved=True,
+                    is_admin=True,
+                    telegram_id=str(message.from_user.id)
+                ).first()
+            if not admin_hr:
+                await message.answer(
+                    msg_templates.ASK_FOR_ADMIN_REGISTRATION_HELPER,
+                    parse_mode="Markdown"
+                )
+                return
+                
             vacancies = db.query(Vacancy).order_by(desc(Vacancy.created_at)).all()
             
             if not vacancies:

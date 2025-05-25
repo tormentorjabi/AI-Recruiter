@@ -105,22 +105,23 @@ async def _send_resume(message: Message, command: CommandObject):
 @admin_router.message(
     Command('start'),
     F.chat.id == ADMIN_CHANNEL_ID,
-    F.from_user.id == ADMIN_USER_ID
+#    F.from_user.id == ADMIN_USER_ID
 )
 async def _start_as_admin(message: Message):
     try:
         with Session() as db:
             admin = db.query(HrSpecialist).filter_by(
-                telegram_id=str(ADMIN_USER_ID)
+                telegram_id=str(message.from_user.id)
             ).first()
             user_full_name = message.from_user.full_name
             admin_name = user_full_name if user_full_name else 'Администратор'
             
             if not admin:
                 admin = HrSpecialist(
-                telegram_id=str(ADMIN_USER_ID),
+                telegram_id=str(message.from_user.id),
                 full_name=admin_name,
-                is_approved=True)
+                is_approved=True,
+                is_admin=True)
                 db.add(admin)
                 db.commit()
                 
@@ -144,7 +145,7 @@ async def _start_as_admin(message: Message):
 @admin_router.message(
     Command('generate_token'),
     F.chat.id == ADMIN_CHANNEL_ID,
-    F.from_user.id == ADMIN_USER_ID
+#    F.from_user.id == ADMIN_USER_ID
 )
 async def _generate_token(message: Message):
     await message.answer(
@@ -153,9 +154,16 @@ async def _generate_token(message: Message):
     try:
         with Session() as db:
             admin = db.query(HrSpecialist).filter_by(
-                telegram_id=str(ADMIN_USER_ID)
+                telegram_id=str(message.from_user.id)
             ).first()
             
+            if not admin or not admin.is_admin:
+                await message.answer(
+                    msg_templates.ASK_FOR_ADMIN_REGISTRATION_HELPER,
+                    parse_mode="Markdown"
+                )
+                return
+                            
             # Токены живут 24 часа (настраиваемо)
             token = RegistrationToken.generate_token(admin.id)
             generated_token = token.token
@@ -177,11 +185,22 @@ async def _generate_token(message: Message):
 @admin_router.message(
     Command('list_hrs'),
     F.chat.id == ADMIN_CHANNEL_ID,
-    F.from_user.id == ADMIN_USER_ID
+#    F.from_user.id == ADMIN_USER_ID
 )
 async def _get_hr_list(message: Message):
     try:
         with Session() as db:
+            admin = db.query(HrSpecialist).filter_by(
+                telegram_id=str(message.from_user.id)
+            ).first()
+            
+            if not admin or not admin.is_admin:
+                await message.answer(
+                    msg_templates.ASK_FOR_ADMIN_REGISTRATION_HELPER,
+                    parse_mode="Markdown"
+                )
+                return
+                
             hrs = db.query(HrSpecialist).filter_by(
                     is_approved=True
                 ).order_by(HrSpecialist.created_at.desc()).all()
@@ -211,7 +230,7 @@ async def _get_hr_list(message: Message):
 @admin_router.message(
     Command('delete_hr'),
     F.chat.id == ADMIN_CHANNEL_ID,
-    F.from_user.id == ADMIN_USER_ID
+#    F.from_user.id == ADMIN_USER_ID
 )
 async def _delete_hr(
     message: Message,
@@ -228,19 +247,13 @@ async def _delete_hr(
             return
 
         telegram_id = args[0].strip()
-
-        if telegram_id == str(ADMIN_USER_ID):
-            await message.answer(
-            msg_templates.SYSTEM_ADMIN_DELETE_PREVENTED
-            )
-            return
         
         with Session() as db:
             hr = db.query(HrSpecialist).filter_by(
                     is_approved=True,
                     telegram_id=telegram_id
                 ).first()
-            
+                
             if not hr:
                 await message.answer(
                     msg_templates.hr_with_id_not_found_message(telegram_id=telegram_id),
@@ -250,6 +263,11 @@ async def _delete_hr(
                     msg_templates.SHOW_LIST_HR_COMMAND_HELPER,
                     parse_mode="Markdown"
                 )
+                return
+            
+            if hr.is_admin:
+                await message.answer(
+                msg_templates.SYSTEM_ADMIN_DELETE_PREVENTED)
                 return
             
             await state.update_data(hr_id=hr.id, telegram_id=telegram_id)

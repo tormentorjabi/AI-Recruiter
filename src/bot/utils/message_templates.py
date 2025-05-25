@@ -185,6 +185,9 @@ def hr_deleted_message(hr_full_name: str, telegram_id: str) -> str:
         f"✅ HR-специалист {hr_full_name} (ID: {telegram_id}) удален"
     )
 
+ASK_FOR_ADMIN_REGISTRATION_HELPER = (
+    "❌ Пожалуйста, воспользуйтесь */start*, для регистрации в качестве Администратора"
+) 
 
 def show_admin_helper_message(admin_name: str) -> str:
     return (

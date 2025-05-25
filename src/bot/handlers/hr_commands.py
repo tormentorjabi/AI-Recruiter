@@ -131,10 +131,6 @@ def _get_archive_keyboard() -> InlineKeyboardMarkup:
 # --------------------------
 #  Init Commands Handlers
 # --------------------------
-'''
-    TODO:
-        - /get_archive - показать архив (двойной - approved/declined)
-'''
 @hr_commands_router.message(Command("get_reviews"))
 async def _get_reviews_selection(message: Message, user=None):
     '''Сформировать меню с выбором категории решений'''
