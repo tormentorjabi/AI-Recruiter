@@ -23,7 +23,10 @@ ADMIN_CHANNEL_ID = int(os.environ.get("ADMIN_CHANNEL_ID"))
 logger = logging.getLogger(__name__)
 
 
-async def create_candidates_entries(bot: Bot, resumes: List[Optional[ResumeData]]) -> List[Tuple[ResumeData, int]]:
+async def create_candidates_entries(
+    bot_chat_info: Tuple[Bot, Optional[int]], 
+    resumes: List[Optional[ResumeData]]
+) -> List[Tuple[ResumeData, int]]:
     '''
     Создать записи в базе данных для списка кандидатов, 
     по данным с резюме и вернуть замапленные (resume_data, id) пары
@@ -38,7 +41,7 @@ async def create_candidates_entries(bot: Bot, resumes: List[Optional[ResumeData]
         resume_data_to_ids = []
         with Session() as db:
             for resume_data in filter(None, resumes):
-                resume_id = await _process_single_resume(bot, db, resume_data)
+                resume_id = await _process_single_resume(bot_chat_info, db, resume_data)
                 if resume_id:
                     resume_data_to_ids.append((resume_data, resume_id))
             return resume_data_to_ids
@@ -47,15 +50,21 @@ async def create_candidates_entries(bot: Bot, resumes: List[Optional[ResumeData]
         return []
 
 
-async def _process_single_resume(bot: Bot, db: SqlAlchemySession, resume_data: ResumeData) -> int:
+async def _process_single_resume(
+    bot_chat_info: Tuple[Bot, Optional[int]], 
+    db: SqlAlchemySession, 
+    resume_data: ResumeData
+) -> int:
     '''Процессинг единичного резюме с созданием всех необходимых моделей'''
     candidate = _create_candidate(db, resume_data)
     application = _create_application(db, resume_data, candidate.id)
-    # TODO: Переделать
+    # TODO: Переделать хендлинг токенов кандидата, на HH API
     t = _handle_application_token(db, application.id)
 
+    bot = bot_chat_info[0]
+    chat_id = bot_chat_info[1] if bot_chat_info[1] else ADMIN_CHANNEL_ID
     await bot.send_message(
-        chat_id=ADMIN_CHANNEL_ID,
+        chat_id=chat_id,
         text=f'*Токен для кандидата - {candidate.full_name}:*\n\n🤖 `{t}`',
         parse_mode="Markdown"
     )

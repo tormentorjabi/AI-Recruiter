@@ -90,8 +90,9 @@ async def _send_resume(message: Message, command: CommandObject):
                 return
             vacancy_id = vacancy.id
         
+        bot_chat_info = (message.bot, message.chat.id)
         await resumes_processing_task(
-            bot=message.bot,
+            bot_chat_info=bot_chat_info,
             resumes_data=[
                 (resume_url, vacancy_id)
             ]

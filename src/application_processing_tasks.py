@@ -58,7 +58,11 @@ async def create_test_vacancy_task() -> None:
     # return test_return_data
 
 
-async def resumes_processing_task(bot: Bot, resumes_data: Optional[List[Tuple[str, int]]],  delay_hours: int = 24) -> None:
+async def resumes_processing_task(
+    bot_chat_info: Tuple[Bot, Optional[int]], 
+    resumes_data: Optional[List[Tuple[str, int]]],  
+    delay_hours: int = 24
+) -> None:
     #while True:
         try:
             '''
@@ -81,7 +85,7 @@ async def resumes_processing_task(bot: Bot, resumes_data: Optional[List[Tuple[st
                 return
             
             # Заполняем базу данных необходимыми сущностями
-            created_entries = await create_candidates_entries(bot=bot, resumes=parsed_results)
+            created_entries = await create_candidates_entries(bot_chat_info=bot_chat_info, resumes=parsed_results)
             if not created_entries:
                 logger.error(f'No resume entries were created. Skipping updates')
 
