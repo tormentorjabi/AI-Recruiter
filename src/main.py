@@ -76,11 +76,11 @@ async def main() -> None:
             if os.getenv('ENVIRONMENT') == 'development':
                 commands.extend([
                     # [DEV MODE ONLY] commands
-                    BotCommand(command='/send', description='Загрузить резюме по вакансии в систему (DEV MODE ONLY)'),
-                    BotCommand(command='/restart', description='Очистить БД и перезапуститься (DEV MODE ONLY)'),
-                    BotCommand(command='/vacancies_test', description='Тест: Создание вакансий (DEV MODE ONLY)'),
-                    BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
-                    BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
+                    BotCommand(command='/send', description='Загрузить резюме по вакансии в систему (ТОЛЬКО ДЛЯ ДЕМО)'),
+                    BotCommand(command='/restart', description='Перезапуск приложения (ТОЛЬКО ДЛЯ ДЕМО)'),
+                    # BotCommand(command='/vacancies_test', description='Тест: Создание вакансий (DEV MODE ONLY)'),
+                    # BotCommand(command='/token_test', description='Тест: Регистрация клиента по токену + анкета (DEV MODE ONLY)'),
+                    # BotCommand(command='/notification_test', description='Тест: Меню с решениями для HR (DEV MODE ONLY)'),
                 ])
             
             '''
