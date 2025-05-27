@@ -354,6 +354,7 @@ async def candidate_start(message: Message, state: FSMContext):
                     parse_mode="Markdown"
                 )
                 await message.answer(msg_templates.TOKEN_AUTH_REQUEST)
+                await message.answer(msg_templates.DEMO_HELPER, parse_mode="Markdown")
                 await state.set_state(CandidateStates.token_auth)
                 return
 

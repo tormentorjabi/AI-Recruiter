@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 
 from src.bot.core.bot import bot, dp
 from src.bot.utils.check_abandoned_forms import check_abandoned_forms
-from src.application_processing_tasks import create_test_vacancy_task
 
 
 logging.basicConfig(
@@ -94,7 +93,6 @@ async def main() -> None:
             
             tasks = [
                 # DEV MODE ONLY [Обход HH API]
-                asyncio.create_task(create_test_vacancy_task()),
                 #asyncio.create_task(resumes_processing_task(bot=bot, delay_hours=24)),
                 
                 # Production tasks

@@ -71,6 +71,11 @@ async def _process_single_resume(
     
     resume = await _create_resume(db, resume_data, candidate.id, application.id)
     if not resume:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f'*Данные об этом резюме уже находятся в системе, пожалуйста, попробуйте отправить команду /send с другим резюме*',
+            parse_mode="Markdown"
+        )
         return
     
     resume_id = resume.id
